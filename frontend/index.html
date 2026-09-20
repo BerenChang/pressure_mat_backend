@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    />
+    <title>Pressure Mat Visualizer</title>
+</head>
+
+<body>
+    <div id="app">
+        <header class="app-header">
+            <div>
+                <h1>Pressure Mat Visualizer</h1>
+                <p>28 × 56 real-time pressure data</p>
+            </div>
+
+            <div class="status-area">
+                <div class="acquisition-controls">
+                    <button
+                        id="start-reading"
+                        class="control-button start-button"
+                        type="button"
+                        disabled
+                    >
+                        Start
+                    </button>
+                
+                    <button
+                        id="stop-reading"
+                        class="control-button stop-button"
+                        type="button"
+                        disabled
+                    >
+                        Stop
+                    </button>
+                </div>
+                <div class="status-item">
+                    <span id="status-dot" class="status-dot"></span>
+                    <span id="connection-status">Disconnected</span>
+                </div>
+
+                <div class="status-item">
+                    <span>Rate</span>
+                    <strong id="frame-rate">0 FPS</strong>
+                </div>
+
+                <div class="status-item">
+                    <span>Frames</span>
+                    <strong id="frame-count">0</strong>
+                </div>
+            </div>
+        </header>
+
+        <main class="visualization-grid">
+            <section class="panel">
+                <div class="panel-header">
+                    <h2>2D Heatmap</h2>
+                    <span>Canvas</span>
+                </div>
+
+                <div class="canvas-container">
+                    <canvas
+                        id="heatmap"
+                        width="1120"
+                        height="560"
+                    ></canvas>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <h2>3D Pressure Surface</h2>
+                    <span>Three.js</span>
+                </div>
+
+                <div id="surface-3d" class="surface-container"></div>
+            </section>
+        </main>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
