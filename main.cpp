@@ -5,6 +5,10 @@
 #include <QDebug>
 #include <QTimer>
 
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
@@ -57,21 +61,100 @@ int main(int argc, char *argv[])
             ++totalFrames;
         });
 
+    QString activePort;
+    bool readingActive = false;
+
+    auto sendSerialStatus = [&]() {
+        QJsonObject status;
+        status.insert(
+            QStringLiteral("type"),
+            QStringLiteral("serial_status"));
+        status.insert(
+            QStringLiteral("connected"),
+            receiver.isOpen());
+        status.insert(
+            QStringLiteral("reading"),
+            readingActive);
+        status.insert(
+            QStringLiteral("port"),
+            activePort);
+
+        webSocketServer.broadcastTextMessage(
+            QString::fromUtf8(
+                QJsonDocument(status).toJson(
+                    QJsonDocument::Compact)));
+    };
+
     QObject::connect(
         &webSocketServer,
         &PressureWebSocketServer::clientCommandReceived,
-        [&](const QString &command) {
-            if (command == QStringLiteral("start_reading")) {
-                receiver.startReading();
-            } else if (
-                command == QStringLiteral("stop_reading")
-                ) {
-                receiver.stopReading();
-            } else {
-                qWarning().noquote()
-                << "[WEBSOCKET] Unknown command:"
-                << command;
+        [&](const QString &message) {
+            if (message == QStringLiteral("start_reading")) {
+                if (receiver.isOpen()) {
+                    receiver.startReading();
+                    readingActive = true;
+                }
+
+                sendSerialStatus();
+                return;
             }
+
+            if (message == QStringLiteral("stop_reading")) {
+                receiver.stopReading();
+                readingActive = false;
+                sendSerialStatus();
+                return;
+            }
+
+            const QJsonDocument document =
+                QJsonDocument::fromJson(message.toUtf8());
+
+            if (!document.isObject()) {
+                qWarning().noquote()
+                << "[WEBSOCKET] Invalid command:"
+                << message;
+                return;
+            }
+
+            const QJsonObject command = document.object();
+            const QString action =
+                command.value(
+                           QStringLiteral("command")).toString();
+
+            if (action == QStringLiteral("connect")) {
+                const QString portName =
+                    command.value(
+                               QStringLiteral("port")).toString();
+
+                const qint32 baudRate =
+                    static_cast<qint32>(
+                        command.value(
+                                   QStringLiteral("baudRate"))
+                            .toInt(115200));
+
+                readingActive = false;
+
+                if (receiver.openPort(portName, baudRate)) {
+                    activePort = portName;
+                } else {
+                    activePort.clear();
+                }
+
+                sendSerialStatus();
+                return;
+            }
+
+            if (action == QStringLiteral("disconnect")) {
+                receiver.closePort();
+                activePort.clear();
+                readingActive = false;
+                sendSerialStatus();
+                return;
+            }
+
+            qWarning().noquote()
+                << "[WEBSOCKET] Unknown command:"
+                << message;
         });
 
     QTimer reportTimer;
@@ -88,16 +171,50 @@ int main(int argc, char *argv[])
             framesThisSecond = 0;
         });
 
+    QObject::connect(
+        &webSocketServer,
+        &PressureWebSocketServer::clientCountChanged,
+        [&](int clientCount) {
+            if (clientCount <= 0) {
+                return;
+            }
+
+            QJsonArray ports;
+
+            for (
+                const QString &portName :
+                SerialReceiver::availablePortNames()
+                ) {
+                ports.append(portName);
+            }
+
+            QJsonArray baudRates;
+            baudRates.append(115200);
+            baudRates.append(961200);
+
+            QJsonObject message;
+            message.insert(
+                QStringLiteral("type"),
+                QStringLiteral("serial_ports"));
+            message.insert(
+                QStringLiteral("ports"),
+                ports);
+            message.insert(
+                QStringLiteral("baudRates"),
+                baudRates);
+
+            webSocketServer.broadcastTextMessage(
+                QString::fromUtf8(
+                    QJsonDocument(message).toJson(
+                        QJsonDocument::Compact)));
+
+            sendSerialStatus();
+        });
+
     if (!webSocketServer.listen(9002)) {
         return 1;
     }
 
-    if (!receiver.openPort("COM3", 115200)) {
-        webSocketServer.close();
-        return 1;
-    }
-
-    receiver.startReading();
     reportTimer.start(1000);
 
     QObject::connect(

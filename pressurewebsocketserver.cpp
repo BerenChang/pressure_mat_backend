@@ -89,6 +89,16 @@ void PressureWebSocketServer::broadcastFrame(
     }
 }
 
+void PressureWebSocketServer::broadcastTextMessage(
+    const QString &message)
+{
+    for (QWebSocket *client : clients_) {
+        if (client->state() == QAbstractSocket::ConnectedState) {
+            client->sendTextMessage(message);
+        }
+    }
+}
+
 void PressureWebSocketServer::handleNewConnection()
 {
     while (server_.hasPendingConnections()) {
@@ -147,3 +157,4 @@ void PressureWebSocketServer::handleTextMessage(
 {
     emit clientCommandReceived(message);
 }
+

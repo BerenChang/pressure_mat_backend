@@ -54,6 +54,45 @@
             </div>
         </header>
 
+        <section class="connection-panel">
+            <div class="connection-field">
+                <label for="serial-port">Serial port</label>
+        
+                <select id="serial-port" disabled>
+                    <option value="">No ports detected</option>
+                </select>
+            </div>
+        
+            <div class="connection-field">
+                <label for="baud-rate">Baud rate</label>
+        
+                <select id="baud-rate" disabled>
+                    <option value="115200">115200</option>
+                    <option value="961200">961200</option>
+                </select>
+            </div>
+        
+            <div class="connection-actions">
+                <button
+                    id="connect-serial"
+                    class="control-button connect-button"
+                    type="button"
+                    disabled
+                >
+                    Connect
+                </button>
+        
+                <button
+                    id="disconnect-serial"
+                    class="control-button disconnect-button"
+                    type="button"
+                    disabled
+                >
+                    Disconnect
+                </button>
+            </div>
+        </section>
+
         <main class="visualization-grid">
             <section class="panel">
                 <div class="panel-header">

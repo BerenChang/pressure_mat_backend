@@ -37,6 +37,18 @@ const startButton =
 const stopButton =
     requireElement<HTMLButtonElement>("stop-reading");
 
+const serialPortSelect =
+    requireElement<HTMLSelectElement>("serial-port");
+
+const baudRateSelect =
+    requireElement<HTMLSelectElement>("baud-rate");
+
+const connectSerialButton =
+    requireElement<HTMLButtonElement>("connect-serial");
+
+const disconnectSerialButton =
+    requireElement<HTMLButtonElement>("disconnect-serial");
+
 const surfaceContainer =
     requireElement<HTMLDivElement>("surface-3d");
 
@@ -62,6 +74,7 @@ let renderPending = false;
 let totalFrames = 0;
 let framesSinceReport = 0;
 let readingActive = false;
+let serialConnected = false;
 
 function createColorTable(): Uint8Array {
     const table = new Uint8Array(256 * 3);
@@ -151,23 +164,144 @@ function setConnectionStatus(connected: boolean): void {
         connected ? "Connected" : "Disconnected";
 }
 
-function handleConfiguration(message: string): void {
+function handleBackendMessage(text: string): void {
     try {
-        const configuration = JSON.parse(message);
+        const message = JSON.parse(text) as {
+            type?: string;
+            rows?: number;
+            columns?: number;
+            ports?: unknown;
+            baudRates?: unknown;
+            connected?: boolean;
+            reading?: boolean;
+            port?: string;
+        };
 
-        console.log("Backend configuration:", configuration);
-
-        if (
-            configuration.rows !== ROWS ||
-            configuration.columns !== COLUMNS
-        ) {
-            console.warn(
-                "Unexpected matrix dimensions:",
-                configuration,
+        if (message.type === "configuration") {
+            console.log(
+                "Backend configuration:",
+                message,
             );
+
+            if (
+                message.rows !== ROWS ||
+                message.columns !== COLUMNS
+            ) {
+                console.warn(
+                    "Unexpected matrix dimensions:",
+                    message,
+                );
+            }
+
+            return;
         }
+
+        if (message.type === "serial_ports") {
+            const ports = Array.isArray(message.ports)
+                ? message.ports.filter(
+                    (value): value is string =>
+                        typeof value === "string",
+                )
+                : [];
+
+            const previousPort =
+                serialPortSelect.value;
+
+            serialPortSelect.replaceChildren();
+
+            if (ports.length === 0) {
+                serialPortSelect.add(
+                    new Option(
+                        "No ports detected",
+                        "",
+                    ),
+                );
+            } else {
+                for (const port of ports) {
+                    serialPortSelect.add(
+                        new Option(port, port),
+                    );
+                }
+
+                if (ports.includes(previousPort)) {
+                    serialPortSelect.value =
+                        previousPort;
+                }
+            }
+
+            const baudRates =
+                Array.isArray(message.baudRates)
+                    ? message.baudRates.filter(
+                        (value): value is number =>
+                            typeof value === "number",
+                    )
+                    : [];
+
+            if (baudRates.length > 0) {
+                const previousBaud =
+                    baudRateSelect.value;
+
+                baudRateSelect.replaceChildren();
+
+                for (const baudRate of baudRates) {
+                    const value =
+                        baudRate.toString();
+
+                    baudRateSelect.add(
+                        new Option(value, value),
+                    );
+                }
+
+                if (
+                    baudRates.includes(
+                        Number(previousBaud),
+                    )
+                ) {
+                    baudRateSelect.value =
+                        previousBaud;
+                }
+            }
+
+            updateControlButtons();
+            return;
+        }
+
+        if (message.type === "serial_status") {
+            serialConnected =
+                message.connected === true;
+
+            readingActive =
+                serialConnected &&
+                message.reading === true;
+
+            if (
+                message.port &&
+                Array.from(
+                    serialPortSelect.options,
+                ).some(
+                    (option) =>
+                        option.value === message.port,
+                )
+            ) {
+                serialPortSelect.value =
+                    message.port;
+            }
+
+            connectionStatus.textContent =
+                serialConnected
+                    ? `Mat connected (${message.port})`
+                    : "Backend connected";
+
+            updateControlButtons();
+            return;
+        }
+
+        console.log("Backend message:", message);
     } catch {
-        console.warn("Unknown backend message:", message);
+        console.warn(
+            "Unknown backend message:",
+            text,
+        );
     }
 }
 
@@ -197,14 +331,32 @@ function handleFrame(buffer: ArrayBuffer): void {
 }
 
 function updateControlButtons(): void {
-    const connected =
+    const backendConnected =
         socket?.readyState === WebSocket.OPEN;
 
+    serialPortSelect.disabled =
+        !backendConnected || serialConnected;
+
+    baudRateSelect.disabled =
+        !backendConnected || serialConnected;
+
+    connectSerialButton.disabled =
+        !backendConnected ||
+        serialConnected ||
+        serialPortSelect.value === "";
+
+    disconnectSerialButton.disabled =
+        !backendConnected || !serialConnected;
+
     startButton.disabled =
-        !connected || readingActive;
+        !backendConnected ||
+        !serialConnected ||
+        readingActive;
 
     stopButton.disabled =
-        !connected || !readingActive;
+        !backendConnected ||
+        !serialConnected ||
+        !readingActive;
 }
 
 function connectWebSocket(): void {
@@ -220,7 +372,8 @@ function connectWebSocket(): void {
 
     socket.onopen = () => {
         setConnectionStatus(true);
-        readingActive = true;
+        readingActive = false;
+        serialConnected = false;
         updateControlButtons();
     
         console.log("Connected to pressure-mat backend");
@@ -228,7 +381,7 @@ function connectWebSocket(): void {
 
     socket.onmessage = (event: MessageEvent) => {
         if (typeof event.data === "string") {
-            handleConfiguration(event.data);
+            handleBackendMessage(event.data);
             return;
         }
 
@@ -244,12 +397,56 @@ function connectWebSocket(): void {
     socket.onclose = () => {
         setConnectionStatus(false);
         readingActive = false;
+        serialConnected = false;
         socket = null;
         updateControlButtons();
     
         window.setTimeout(connectWebSocket, 1000);
     };
 }
+
+serialPortSelect.addEventListener(
+    "change",
+    updateControlButtons,
+);
+
+connectSerialButton.addEventListener(
+    "click",
+    () => {
+        if (
+            socket?.readyState !== WebSocket.OPEN ||
+            serialPortSelect.value === ""
+        ) {
+            return;
+        }
+
+        const command = {
+            command: "connect",
+            port: serialPortSelect.value,
+            baudRate: Number(baudRateSelect.value),
+        };
+
+        socket.send(JSON.stringify(command));
+
+        // Prevent repeated clicks while awaiting backend status.
+        connectSerialButton.disabled = true;
+    },
+);
+
+disconnectSerialButton.addEventListener(
+    "click",
+    () => {
+        if (socket?.readyState !== WebSocket.OPEN) {
+            return;
+        }
+
+        socket.send(JSON.stringify({
+            command: "disconnect",
+        }));
+
+        disconnectSerialButton.disabled = true;
+    },
+);
 
 startButton.addEventListener("click", () => {
     if (socket?.readyState !== WebSocket.OPEN) {

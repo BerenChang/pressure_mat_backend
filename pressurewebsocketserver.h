@@ -23,6 +23,7 @@ public:
 
 public slots:
     void broadcastFrame(const QByteArray &payload);
+    void broadcastTextMessage(const QString &message);
 
 signals:
     void clientCountChanged(int count);

@@ -198,6 +198,75 @@ select {
     opacity: 0.4;
 }
 
+.connection-panel {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    border: 1px solid #26334a;
+    border-radius: 14px;
+    background: rgb(13 20 32 / 92%);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+}
+
+.connection-field {
+    display: flex;
+    min-width: 170px;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.connection-field label {
+    color: #8f9db3;
+    font-size: 0.78rem;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.connection-field select {
+    height: 40px;
+    padding: 0 36px 0 12px;
+    border: 1px solid #34425a;
+    border-radius: 9px;
+    color: #eef3fb;
+    background: #111a2a;
+    outline: none;
+}
+
+.connection-field select:focus {
+    border-color: #3b82f6;
+}
+
+.connection-field select:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.connection-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.connect-button {
+    border-color: #2563eb;
+    background: #1d4ed8;
+}
+
+.connect-button:not(:disabled):hover {
+    background: #2563eb;
+}
+
+.disconnect-button {
+    border-color: #64748b;
+    background: #475569;
+}
+
+.disconnect-button:not(:disabled):hover {
+    background: #64748b;
+}
+
 @media (max-width: 1100px) {
     .visualization-grid {
         grid-template-columns: 1fr;
@@ -218,5 +287,22 @@ select {
         width: 100%;
         flex-wrap: wrap;
         gap: 12px 20px;
+    }
+
+    .connection-panel {
+        align-items: stretch;
+        flex-direction: column;
+    }
+    
+    .connection-field {
+        width: 100%;
+    }
+    
+    .connection-actions {
+        width: 100%;
+    }
+    
+    .connection-actions .control-button {
+        flex: 1;
     }
 }
