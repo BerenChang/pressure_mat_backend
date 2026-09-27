@@ -26,12 +26,26 @@ int main(int argc, char *argv[])
             qInfo().noquote() << "[SERIAL]" << message;
         });
 
-    QObject::connect(
-        &receiver,
-        &SerialReceiver::serialError,
-        [](const QString &message) {
-            qCritical().noquote() << "[SERIAL ERROR]" << message;
-        });
+        QObject::connect(
+            &receiver,
+            &SerialReceiver::serialError,
+            [&](const QString &message) {
+                qCritical().noquote()
+                    << "[SERIAL ERROR]" << message;
+        
+                QJsonObject errorMessage;
+                errorMessage.insert(
+                    QStringLiteral("type"),
+                    QStringLiteral("serial_error"));
+                errorMessage.insert(
+                    QStringLiteral("message"),
+                    message);
+        
+                webSocketServer.broadcastTextMessage(
+                    QString::fromUtf8(
+                        QJsonDocument(errorMessage).toJson(
+                            QJsonDocument::Compact)));
+            });
 
     QObject::connect(
         &webSocketServer,
@@ -84,6 +98,50 @@ int main(int argc, char *argv[])
                 QJsonDocument(status).toJson(
                     QJsonDocument::Compact)));
     };
+
+    auto sendPortList = [&]() {
+        QJsonArray ports;
+
+        for (
+            const QString &portName :
+            SerialReceiver::availablePortNames()
+            ) {
+            ports.append(portName);
+        }
+
+        QJsonArray baudRates;
+        baudRates.append(115200);
+        baudRates.append(961200);
+
+        QJsonObject message;
+        message.insert(
+            QStringLiteral("type"),
+            QStringLiteral("serial_ports"));
+        message.insert(
+            QStringLiteral("ports"),
+            ports);
+        message.insert(
+            QStringLiteral("baudRates"),
+            baudRates);
+
+        webSocketServer.broadcastTextMessage(
+            QString::fromUtf8(
+                QJsonDocument(message).toJson(
+                    QJsonDocument::Compact)));
+    };
+
+    QObject::connect(
+        &receiver,
+        &SerialReceiver::connectionChanged,
+        [&](bool connected) {
+            if (connected) {
+                return;
+            }
+
+            readingActive = false;
+            activePort.clear();
+            sendSerialStatus();
+        });
 
     QObject::connect(
         &webSocketServer,
@@ -152,6 +210,11 @@ int main(int argc, char *argv[])
                 return;
             }
 
+            if (action == QStringLiteral("refresh_ports")) {
+                sendPortList();
+                return;
+            }
+
             qWarning().noquote()
                 << "[WEBSOCKET] Unknown command:"
                 << message;
@@ -179,35 +242,7 @@ int main(int argc, char *argv[])
                 return;
             }
 
-            QJsonArray ports;
-
-            for (
-                const QString &portName :
-                SerialReceiver::availablePortNames()
-                ) {
-                ports.append(portName);
-            }
-
-            QJsonArray baudRates;
-            baudRates.append(115200);
-            baudRates.append(961200);
-
-            QJsonObject message;
-            message.insert(
-                QStringLiteral("type"),
-                QStringLiteral("serial_ports"));
-            message.insert(
-                QStringLiteral("ports"),
-                ports);
-            message.insert(
-                QStringLiteral("baudRates"),
-                baudRates);
-
-            webSocketServer.broadcastTextMessage(
-                QString::fromUtf8(
-                    QJsonDocument(message).toJson(
-                        QJsonDocument::Compact)));
-
+            sendPortList();
             sendSerialStatus();
         });
 

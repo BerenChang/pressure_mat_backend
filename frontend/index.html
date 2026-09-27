@@ -74,6 +74,15 @@
         
             <div class="connection-actions">
                 <button
+                    id="refresh-ports"
+                    class="control-button refresh-button"
+                    type="button"
+                    disabled
+                >
+                    Refresh
+                </button>
+
+                <button
                     id="connect-serial"
                     class="control-button connect-button"
                     type="button"
@@ -91,6 +100,61 @@
                     Disconnect
                 </button>
             </div>
+        </section>
+
+        <section class="display-controls">
+            <div class="slider-control">
+                <div class="slider-label">
+                    <label for="noise-threshold">
+                        Noise threshold
+                    </label>
+        
+                    <output id="noise-threshold-value">
+                        0
+                    </output>
+                </div>
+        
+                <input
+                    id="noise-threshold"
+                    type="range"
+                    min="0"
+                    max="255"
+                    step="1"
+                    value="0"
+                />
+        
+                <div class="slider-scale">
+                    <span>0</span>
+                    <span>255</span>
+                </div>
+            </div>
+
+            <div class="slider-control">
+                <div class="slider-label">
+                    <label for="display-maximum">
+                        Display maximum
+                    </label>
+            
+                    <output id="display-maximum-value">
+                        255
+                    </output>
+                </div>
+            
+                <input
+                    id="display-maximum"
+                    type="range"
+                    min="1"
+                    max="255"
+                    step="1"
+                    value="255"
+                />
+            
+                <div class="slider-scale">
+                    <span>1</span>
+                    <span>255</span>
+                </div>
+            </div>
+
         </section>
 
         <main class="visualization-grid">

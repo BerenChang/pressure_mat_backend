@@ -37,6 +37,9 @@ const startButton =
 const stopButton =
     requireElement<HTMLButtonElement>("stop-reading");
 
+const refreshPortsButton =
+    requireElement<HTMLButtonElement>("refresh-ports");
+
 const serialPortSelect =
     requireElement<HTMLSelectElement>("serial-port");
 
@@ -55,6 +58,22 @@ const surfaceContainer =
 const pressureSurface =
     new PressureSurface3D(surfaceContainer);
 
+const noiseThresholdSlider =
+    requireElement<HTMLInputElement>("noise-threshold");
+
+const noiseThresholdValue =
+    requireElement<HTMLOutputElement>(
+        "noise-threshold-value",
+    );
+
+const displayMaximumSlider =
+    requireElement<HTMLInputElement>("display-maximum");
+
+const displayMaximumValue =
+    requireElement<HTMLOutputElement>(
+        "display-maximum-value",
+    );
+
 const sourceCanvas = document.createElement("canvas");
 sourceCanvas.width = COLUMNS;
 sourceCanvas.height = ROWS;
@@ -70,6 +89,10 @@ const colorTable = createColorTable();
 
 let socket: WebSocket | null = null;
 let latestFrame = new Uint8Array(CELL_COUNT);
+const visualizationFrame =
+    new Uint8Array(CELL_COUNT);
+let noiseThreshold = 0;
+let displayMaximum = 255;
 let renderPending = false;
 let totalFrames = 0;
 let framesSinceReport = 0;
@@ -116,7 +139,26 @@ function renderHeatmap(): void {
     renderPending = false;
 
     for (let index = 0; index < CELL_COUNT; index++) {
-        const value = latestFrame[index];
+        const rawValue = latestFrame[index];
+
+        let value = 0;
+
+        if (rawValue > noiseThreshold) {
+            const displayRange = Math.max(
+                1,
+                displayMaximum - noiseThreshold,
+            );
+
+            value = Math.min(
+                255,
+                Math.round(
+                    ((rawValue - noiseThreshold) * 255) /
+                    displayRange,
+                ),
+            );
+        }
+
+        visualizationFrame[index] = value;
         const pixelOffset = index * 4;
         const colorOffset = value * 3;
 
@@ -146,7 +188,7 @@ function renderHeatmap(): void {
         canvas.height,
     );
 
-    pressureSurface.update(latestFrame);
+    pressureSurface.update(visualizationFrame);
 }
 
 function requestHeatmapRender(): void {
@@ -287,11 +329,34 @@ function handleBackendMessage(text: string): void {
                     message.port;
             }
 
+            statusDot.classList.add("connected");
+
             connectionStatus.textContent =
                 serialConnected
                     ? `Mat connected (${message.port})`
                     : "Backend connected";
 
+            updateControlButtons();
+            return;
+        }
+
+        if (message.type === "serial_error") {
+            const errorMessage =
+                typeof (
+                    message as { message?: unknown }
+                ).message === "string"
+                    ? (
+                        message as { message: string }
+                    ).message
+                    : "Unknown serial error";
+        
+            serialConnected = false;
+            readingActive = false;
+        
+            statusDot.classList.remove("connected");
+            connectionStatus.textContent =
+                `Serial error: ${errorMessage}`;
+        
             updateControlButtons();
             return;
         }
@@ -357,6 +422,9 @@ function updateControlButtons(): void {
         !backendConnected ||
         !serialConnected ||
         !readingActive;
+    
+    refreshPortsButton.disabled =
+        !backendConnected || serialConnected;
 }
 
 function connectWebSocket(): void {
@@ -405,6 +473,25 @@ function connectWebSocket(): void {
     };
 }
 
+refreshPortsButton.addEventListener(
+    "click",
+    () => {
+        if (
+            socket?.readyState !== WebSocket.OPEN ||
+            serialConnected
+        ) {
+            return;
+        }
+
+        socket.send(JSON.stringify({
+            command: "refresh_ports",
+        }));
+
+        // Re-enabled when the refreshed list arrives.
+        refreshPortsButton.disabled = true;
+    },
+);
+
 serialPortSelect.addEventListener(
     "change",
     updateControlButtons,
@@ -445,6 +532,52 @@ disconnectSerialButton.addEventListener(
         }));
 
         disconnectSerialButton.disabled = true;
+    },
+);
+
+noiseThresholdSlider.addEventListener(
+    "input",
+    () => {
+        noiseThreshold = Math.min(
+            Number(noiseThresholdSlider.value),
+            254,
+        );
+
+        noiseThresholdSlider.value =
+            noiseThreshold.toString();
+
+        noiseThresholdValue.value =
+            noiseThreshold.toString();
+
+        if (displayMaximum <= noiseThreshold) {
+            displayMaximum = noiseThreshold + 1;
+
+            displayMaximumSlider.value =
+                displayMaximum.toString();
+
+            displayMaximumValue.value =
+                displayMaximum.toString();
+        }
+
+        requestHeatmapRender();
+    },
+);
+
+displayMaximumSlider.addEventListener(
+    "input",
+    () => {
+        displayMaximum = Math.max(
+            noiseThreshold + 1,
+            Number(displayMaximumSlider.value),
+        );
+
+        displayMaximumSlider.value =
+            displayMaximum.toString();
+
+        displayMaximumValue.value =
+            displayMaximum.toString();
+
+        requestHeatmapRender();
     },
 );
 
