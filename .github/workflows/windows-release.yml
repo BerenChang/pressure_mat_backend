@@ -38,6 +38,11 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Set up Python for Qt installer
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
       - name: Install Qt and MinGW
         uses: jurplel/install-qt-action@v4
         with:
@@ -47,6 +52,7 @@ jobs:
           arch: win64_mingw
           modules: "qtserialport qtwebsockets"
           tools: "tools_mingw1310,qt.tools.win64_mingw1310"
+          setup-python: false
           cache: true
 
       - name: Configure CMake
