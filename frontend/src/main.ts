@@ -16,12 +16,23 @@ function requireElement<T extends HTMLElement>(id: string): T {
     return element as T;
 }
 
-const canvas = requireElement<HTMLCanvasElement>("heatmap");
-const context = canvas.getContext("2d");
+function require2DContext(
+    canvasElement: HTMLCanvasElement,
+): CanvasRenderingContext2D {
+    const canvasContext =
+        canvasElement.getContext("2d");
 
-if (context === null) {
-    throw new Error("2D Canvas is not supported");
+    if (canvasContext === null) {
+        throw new Error(
+            "2D Canvas is not supported",
+        );
+    }
+
+    return canvasContext;
 }
+
+const canvas = requireElement<HTMLCanvasElement>("heatmap");
+const context = require2DContext(canvas);
 
 const statusDot = requireElement<HTMLSpanElement>("status-dot");
 const connectionStatus =
@@ -78,11 +89,8 @@ const sourceCanvas = document.createElement("canvas");
 sourceCanvas.width = COLUMNS;
 sourceCanvas.height = ROWS;
 
-const sourceContext = sourceCanvas.getContext("2d");
-
-if (sourceContext === null) {
-    throw new Error("Could not create heatmap buffer");
-}
+const sourceContext =
+    require2DContext(sourceCanvas);
 
 const imageData = sourceContext.createImageData(COLUMNS, ROWS);
 const colorTable = createColorTable();

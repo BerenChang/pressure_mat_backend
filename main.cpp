@@ -1,5 +1,6 @@
 #include "PressureWebSocketServer.h"
 #include "SerialReceiver.h"
+#include "StaticHttpServer.h"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -9,15 +10,73 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
+#include <QDir>
+#include <QFileInfo>
+#include <QStringList>
+#include <QProcess>
+
+namespace
+{
+QString findFrontendDirectory()
+{
+    const QDir applicationDirectory(
+        QCoreApplication::applicationDirPath());
+
+    const QStringList candidates{
+        // Final packaged location.
+        applicationDirectory.filePath(
+            QStringLiteral("frontend")),
+
+        // Qt Creator development-build location.
+        applicationDirectory.filePath(
+            QStringLiteral(
+                "../../frontend/dist")),
+
+        // Additional development fallback.
+        QDir::current().filePath(
+            QStringLiteral("frontend/dist"))
+    };
+
+    for (const QString &candidate : candidates) {
+        const QFileInfo indexFile(
+            QDir(candidate).filePath(
+                QStringLiteral("index.html")));
+
+        if (indexFile.isFile()) {
+            return QDir(candidate).canonicalPath();
+        }
+    }
+
+    return {};
+}
+}
+
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
 
     SerialReceiver receiver;
     PressureWebSocketServer webSocketServer;
+    StaticHttpServer httpServer;
 
     quint64 framesThisSecond = 0;
     quint64 totalFrames = 0;
+
+    QObject::connect(
+        &httpServer,
+        &StaticHttpServer::statusMessage,
+        [](const QString &message) {
+            qInfo().noquote()
+            << "[HTTP]" << message;
+        });
+
+    QObject::connect(
+        &httpServer,
+        &StaticHttpServer::serverError,
+        [](const QString &message) {
+            qCritical().noquote()
+            << "[HTTP ERROR]" << message;
+        });
 
     QObject::connect(
         &receiver,
@@ -250,6 +309,40 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    const QString frontendDirectory =
+        findFrontendDirectory();
+
+    if (frontendDirectory.isEmpty()) {
+        qCritical()
+        << "Could not find frontend/dist/index.html";
+
+        webSocketServer.close();
+        return 1;
+    }
+
+    if (!httpServer.listen(frontendDirectory, 8080)) {
+        webSocketServer.close();
+        return 1;
+    }
+
+    QTimer::singleShot(
+        250,
+        []() {
+            const QString dashboardUrl =
+                QStringLiteral(
+                    "http://127.0.0.1:8080");
+
+            if (
+                !QProcess::startDetached(
+                    QStringLiteral("explorer.exe"),
+                    QStringList{dashboardUrl})
+                ) {
+                qWarning()
+                << "Could not open dashboard:"
+                << dashboardUrl;
+            }
+        });
+
     reportTimer.start(1000);
 
     QObject::connect(
@@ -259,6 +352,7 @@ int main(int argc, char *argv[])
             reportTimer.stop();
             receiver.closePort();
             webSocketServer.close();
+            httpServer.close();
         });
 
     return app.exec();

@@ -82,3 +82,17 @@ CMakeLists.txt.user*
 .uic/
 /build*/
 /.qtcreator/
+
+# CMake and Qt build output
+/build/
+/release/
+CMakeLists.txt.user*
+
+# Frontend generated files
+/frontend/node_modules/
+/frontend/dist/
+
+# Packaged release archives
+/*.zip
+
+/dev_plan.txt
