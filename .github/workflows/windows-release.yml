@@ -1,0 +1,116 @@
+name: Windows Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows application
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Install Qt and MinGW
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.11.2"
+          host: windows
+          target: desktop
+          arch: win64_mingw
+          modules: "qtserialport qtwebsockets"
+          tools: "tools_mingw1310,qt.tools.win64_mingw1310"
+          cache: true
+
+      - name: Configure CMake
+        shell: pwsh
+        run: |
+          cmake -S . -B build/release `
+            -G "MinGW Makefiles" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+
+      - name: Build backend
+        shell: pwsh
+        run: |
+          cmake --build build/release --parallel
+
+      - name: Create portable package
+        shell: pwsh
+        run: |
+          $packageDir = "stage\PressureMat"
+
+          New-Item -ItemType Directory -Force $packageDir
+
+          Copy-Item `
+            "build\release\pressure_mat_backend.exe" `
+            $packageDir
+
+          Copy-Item `
+            "build\release\frontend" `
+            "$packageDir\frontend" `
+            -Recurse
+
+          windeployqt `
+            --release `
+            --compiler-runtime `
+            --dir $packageDir `
+            "$packageDir\pressure_mat_backend.exe"
+
+          Compress-Archive `
+            -Path "$packageDir\*" `
+            -DestinationPath "stage\PressureMat-Windows-x64.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PressureMat-Windows-x64
+          path: stage/PressureMat-Windows-x64.zip
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $asset = "stage\PressureMat-Windows-x64.zip"
+
+          gh release view $tag *> $null
+
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $asset --clobber
+          }
+          else {
+            gh release create $tag $asset `
+              --title "Pressure Mat $tag" `
+              --generate-notes
+          }
