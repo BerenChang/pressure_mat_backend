@@ -68,31 +68,102 @@ jobs:
         run: |
           cmake --build build/release --parallel
 
-      - name: Create portable package
+      - name: Install 7-Zip
+        shell: pwsh
+        run: |
+          choco install 7zip.install -y --no-progress
+
+      - name: Create single-file portable application
         shell: pwsh
         run: |
           $packageDir = "stage\PressureMat"
 
-          New-Item -ItemType Directory -Force $packageDir
+          # Create staging directory
+          New-Item -ItemType Directory -Force $packageDir | Out-Null
 
+          # Copy backend executable
           Copy-Item `
             "build\release\pressure_mat_backend.exe" `
-            $packageDir
+            "$packageDir\PressureMat.exe"
 
+          # Copy frontend
           Copy-Item `
             "build\release\frontend" `
             "$packageDir\frontend" `
             -Recurse
 
+          # Deploy Qt DLLs and runtime dependencies
           windeployqt `
             --release `
             --compiler-runtime `
             --dir $packageDir `
-            "$packageDir\pressure_mat_backend.exe"
+            "$packageDir\PressureMat.exe"
 
+          # Locate 7-Zip
+          $sevenZip = "${env:ProgramFiles}\7-Zip\7z.exe"
+          $sevenZipSfx = "${env:ProgramFiles}\7-Zip\7z.sfx"
+
+          if (!(Test-Path $sevenZip)) {
+            throw "7z.exe was not found at $sevenZip"
+          }
+
+          if (!(Test-Path $sevenZipSfx)) {
+            throw "7z.sfx was not found at $sevenZipSfx"
+          }
+
+          # Create SFX configuration
+          $sfxConfig = @'
+;!@Install@!UTF-8!
+Title="Pressure Mat Visualizer"
+RunProgram="PressureMat.exe"
+;!@InstallEnd@!
+'@
+
+          $sfxConfigPath = "stage\sfx-config.txt"
+
+          $sfxConfig | Out-File `
+            -FilePath $sfxConfigPath `
+            -Encoding utf8 `
+            -NoNewline
+
+          # Create 7z archive containing the complete application
+          & $sevenZip a `
+            -t7z `
+            "stage\PressureMat.7z" `
+            "$packageDir\*" `
+            -mx=9
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "7-Zip failed to create the application archive."
+          }
+
+          # Create self-extracting EXE
+          $sfxExe = "stage\PressureMat.exe"
+
+          cmd.exe /c `
+            "copy /b `"$sevenZipSfx`"+`"$sfxConfigPath`"+`"stage\PressureMat.7z`" `"$sfxExe`""
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to create self-extracting EXE."
+          }
+
+          if (!(Test-Path $sfxExe)) {
+            throw "Self-extracting EXE was not created."
+          }
+
+          # Create customer-facing ZIP containing ONLY PressureMat.exe
           Compress-Archive `
-            -Path "$packageDir\*" `
-            -DestinationPath "stage\PressureMat-Windows-x64.zip"
+            -Path $sfxExe `
+            -DestinationPath "stage\PressureMat-Windows-x64.zip" `
+            -CompressionLevel Optimal
+
+          # Show final package contents
+          Write-Host ""
+          Write-Host "========== Final customer package =========="
+          Get-ChildItem "stage\PressureMat-Windows-x64.zip"
+          Write-Host ""
+          Write-Host "The ZIP contains:"
+          & $sevenZip l "stage\PressureMat-Windows-x64.zip"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
