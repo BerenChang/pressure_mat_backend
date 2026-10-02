@@ -101,9 +101,10 @@ jobs:
         run: |
           $sevenZip = "C:\Program Files\7-Zip\7z.exe"
           $sfxModule = "C:\Program Files\7-Zip\7z.sfx"
-          $archive = "stage\PressureMat.7z"
-          $config = "stage\sfx-config.txt"
-          $outputExe = "stage\PressureMat.exe"
+
+          $archive = Join-Path $PWD "stage\PressureMat.7z"
+          $config = Join-Path $PWD "stage\sfx-config.txt"
+          $outputExe = Join-Path $PWD "stage\PressureMat.exe"
 
           if (-not (Test-Path $sevenZip)) {
             throw "7z.exe not found: $sevenZip"
@@ -113,6 +114,7 @@ jobs:
             throw "7z.sfx not found: $sfxModule"
           }
 
+          # Create compressed archive containing the deployed application
           & $sevenZip a `
             -t7z `
             $archive `
@@ -123,6 +125,7 @@ jobs:
             throw "Failed to create 7-Zip archive"
           }
 
+          # Configuration for the self-extracting executable
           $configLines = @(
             ";!@Install@!UTF-8!"
             'Title="Pressure Mat Visualizer"'
@@ -131,26 +134,18 @@ jobs:
           )
 
           [System.IO.File]::WriteAllLines(
-            (Join-Path $PWD $config),
+            $config,
             $configLines,
             [System.Text.UTF8Encoding]::new($false)
           )
 
-          $sfxBytes = [System.IO.File]::ReadAllBytes(
-            (Join-Path $PWD $sfxModule)
-          )
+          # Read the SFX module, configuration and application archive
+          $sfxBytes = [System.IO.File]::ReadAllBytes($sfxModule)
+          $configBytes = [System.IO.File]::ReadAllBytes($config)
+          $archiveBytes = [System.IO.File]::ReadAllBytes($archive)
 
-          $configBytes = [System.IO.File]::ReadAllBytes(
-            (Join-Path $PWD $config)
-          )
-
-          $archiveBytes = [System.IO.File]::ReadAllBytes(
-            (Join-Path $PWD $archive)
-          )
-
-          $outputPath = Join-Path $PWD $outputExe
-
-          $stream = [System.IO.File]::Create($outputPath)
+          # Combine them into one executable
+          $stream = [System.IO.File]::Create($outputExe)
 
           try {
             $stream.Write($sfxBytes, 0, $sfxBytes.Length)
@@ -165,7 +160,8 @@ jobs:
             throw "PressureMat.exe was not created"
           }
 
-          Write-Host "Single executable created:"
+          Write-Host ""
+          Write-Host "Single executable successfully created:"
           Get-Item $outputExe
 
       - name: Create customer ZIP
