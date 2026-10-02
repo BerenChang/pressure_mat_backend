@@ -129,6 +129,12 @@ select {
     letter-spacing: 0.08em;
 }
 
+.panel-header .cop-legend {
+    color: #ff5555;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
 .canvas-container,
 .surface-container {
     position: relative;

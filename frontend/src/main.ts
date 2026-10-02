@@ -1,5 +1,7 @@
 import "./style.css";
 import { PressureSurface3D } from "./PressureSurface3D";
+import { calculateCentreOfPressure } from "./centreOfPressure";
+import type { CentreOfPressure } from "./centreOfPressure";
 
 const ROWS = 28;
 const COLUMNS = 56;
@@ -146,6 +148,10 @@ function createColorTable(): Uint8Array {
 function renderHeatmap(): void {
     renderPending = false;
 
+    const centreOfPressure = calculateCentreOfPressure(
+        latestFrame, ROWS, COLUMNS, noiseThreshold,
+    );
+
     for (let index = 0; index < CELL_COUNT; index++) {
         const rawValue = latestFrame[index];
 
@@ -196,7 +202,30 @@ function renderHeatmap(): void {
         canvas.height,
     );
 
-    pressureSurface.update(visualizationFrame);
+    drawCentreOfPressure(centreOfPressure);
+    pressureSurface.update(visualizationFrame, centreOfPressure);
+}
+
+function drawCentreOfPressure(centre: CentreOfPressure | null): void {
+    if (centre === null) {
+        return;
+    }
+
+    // Canvas pixels represent cells, so add half a cell to reach its centre.
+    const x = ((centre.column + 0.5) / COLUMNS) * canvas.width;
+    const y = ((centre.row + 0.5) / ROWS) * canvas.height;
+    // Keep the dot at a visible 6 CSS-pixel radius as the panel resizes.
+    const radius = 6 * canvas.width / (canvas.clientWidth || canvas.width);
+
+    context.save();
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fillStyle = "#ff0000";
+    context.fill();
+    context.strokeStyle = "#ffffff";
+    context.lineWidth = radius * 0.25;
+    context.stroke();
+    context.restore();
 }
 
 function requestHeatmapRender(): void {

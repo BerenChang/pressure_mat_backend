@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { CentreOfPressure } from "./centreOfPressure";
 import { OrbitControls } from
     "three/examples/jsm/controls/OrbitControls.js";
 
@@ -17,6 +18,7 @@ export class PressureSurface3D {
     private readonly positionAttribute: THREE.BufferAttribute;
     private readonly colorAttribute: THREE.BufferAttribute;
     private readonly resizeObserver: ResizeObserver;
+    private readonly centreMarker: THREE.Sprite;
 
     public constructor(container: HTMLElement) {
         this.container = container;
@@ -87,6 +89,35 @@ export class PressureSurface3D {
 
         this.scene.add(surface);
 
+        // A billboard keeps the marker legible when the camera rotates.
+        const markerCanvas = document.createElement("canvas");
+        markerCanvas.width = 64;
+        markerCanvas.height = 64;
+        const markerContext = markerCanvas.getContext("2d");
+        if (markerContext === null) {
+            throw new Error("2D Canvas is not supported");
+        }
+        markerContext.beginPath();
+        markerContext.arc(32, 32, 25, 0, Math.PI * 2);
+        markerContext.fillStyle = "#ff0000";
+        markerContext.fill();
+        markerContext.strokeStyle = "#ffffff";
+        markerContext.lineWidth = 6;
+        markerContext.stroke();
+
+        const markerTexture = new THREE.CanvasTexture(markerCanvas);
+        markerTexture.colorSpace = THREE.SRGBColorSpace;
+        this.centreMarker = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: markerTexture,
+            sizeAttenuation: false,
+            depthTest: false,
+            depthWrite: false,
+        }));
+        this.centreMarker.scale.set(0.085, 0.085, 1);
+        this.centreMarker.renderOrder = 1;
+        this.centreMarker.visible = false;
+        this.scene.add(this.centreMarker);
+
         const grid = new THREE.GridHelper(
             70,
             28,
@@ -138,7 +169,10 @@ export class PressureSurface3D {
         this.animate();
     }
 
-    public update(frame: Uint8Array): void {
+    public update(
+        frame: Uint8Array,
+        centre: CentreOfPressure | null = null,
+    ): void {
         if (frame.length !== CELL_COUNT) {
             return;
         }
@@ -165,6 +199,41 @@ export class PressureSurface3D {
         this.colorAttribute.needsUpdate = true;
 
         this.geometry.computeVertexNormals();
+        this.updateCentreMarker(centre);
+    }
+
+    private updateCentreMarker(centre: CentreOfPressure | null): void {
+        this.centreMarker.visible = centre !== null;
+        if (centre === null) {
+            return;
+        }
+
+        const column = Math.min(COLUMNS - 1, Math.max(0, centre.column));
+        const row = Math.min(ROWS - 1, Math.max(0, centre.row));
+        const left = Math.min(COLUMNS - 2, Math.floor(column));
+        const top = Math.min(ROWS - 2, Math.floor(row));
+        const fx = column - left;
+        const fy = row - top;
+        const a = top * COLUMNS + left;
+        const b = a + COLUMNS;
+        const c = b + 1;
+        const d = a + 1;
+        const positions = this.positionAttribute;
+
+        // Interpolate the actual PlaneGeometry triangle beneath the marker.
+        const height = fx + fy <= 1
+            ? positions.getY(a)
+                + fx * (positions.getY(d) - positions.getY(a))
+                + fy * (positions.getY(b) - positions.getY(a))
+            : positions.getY(c)
+                + (1 - fx) * (positions.getY(b) - positions.getY(c))
+                + (1 - fy) * (positions.getY(d) - positions.getY(c));
+
+        this.centreMarker.position.set(
+            positions.getX(a) + fx * (positions.getX(d) - positions.getX(a)),
+            height + 0.35,
+            positions.getZ(a) + fy * (positions.getZ(b) - positions.getZ(a)),
+        );
     }
 
     private pressureColor(
