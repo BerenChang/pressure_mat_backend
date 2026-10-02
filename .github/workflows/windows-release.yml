@@ -76,6 +76,9 @@ jobs:
       - name: Download 7-Zip Extra
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force "stage" | Out-Null
+          New-Item -ItemType Directory -Force "stage\7zip-extra" | Out-Null
+
           $url = "https://www.7-zip.org/a/7z2603-extra.7z"
 
           Invoke-WebRequest `
@@ -86,6 +89,10 @@ jobs:
             "stage\7zip-extra.7z" `
             "-ostage\7zip-extra" `
             -y
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to extract 7-Zip Extra"
+          }
 
           Write-Host "7-Zip Extra contents:"
           Get-ChildItem "stage\7zip-extra" -Recurse
