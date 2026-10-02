@@ -73,13 +73,13 @@ jobs:
         run: |
           choco install 7zip.install -y --no-progress
 
-      - name: Download 7-Zip Extra
+      - name: Download 7-Zip Installer SFX
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force "stage" | Out-Null
           New-Item -ItemType Directory -Force "stage\7zip-extra" | Out-Null
 
-          $url = "https://www.7-zip.org/a/7z2603-extra.7z"
+          $url = "https://github.com/ip7z/7zip/releases/download/23.01/7z2301-extra.7z"
 
           Invoke-WebRequest `
             -Uri $url `
@@ -94,24 +94,33 @@ jobs:
             throw "Failed to extract 7-Zip Extra"
           }
 
-          Write-Host "7-Zip Extra contents:"
+          Write-Host "Extracted files:"
           Get-ChildItem "stage\7zip-extra" -Recurse
 
       - name: Create single executable
         shell: pwsh
         run: |
           $sevenZip = "C:\Program Files\7-Zip\7z.exe"
-          $sfxModule = Join-Path $PWD "stage\7zip-extra\7zS.sfx"
+
+          $sfxModule = Get-ChildItem `
+            "stage\7zip-extra" `
+            -Recurse `
+            -Filter "7zS.sfx" |
+            Select-Object -First 1
+
+          if ($null -eq $sfxModule) {
+            throw "7zS.sfx was not found in the extracted 7-Zip Extra package"
+          }
+
+          $sfxModule = $sfxModule.FullName
+
+          Write-Host "Using SFX module:"
+          Write-Host $sfxModule
 
           $archive = Join-Path $PWD "stage\PressureMat.7z"
           $config = Join-Path $PWD "stage\sfx-config.txt"
           $outputExe = Join-Path $PWD "stage\PressureMat.exe"
 
-          if (-not (Test-Path $sfxModule)) {
-            throw "Installer SFX module not found: $sfxModule"
-          }
-
-          # Create compressed application archive
           & $sevenZip a `
             -t7z `
             $archive `
@@ -122,8 +131,6 @@ jobs:
             throw "Failed to create PressureMat.7z"
           }
 
-          # SFX configuration:
-          # extract to a temporary directory and launch PressureMat.exe
           $configLines = @(
             ";!@Install@!UTF-8!"
             'Title="Pressure Mat Visualizer"'
