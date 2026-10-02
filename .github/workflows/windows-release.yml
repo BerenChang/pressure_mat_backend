@@ -73,48 +73,38 @@ jobs:
         run: |
           choco install 7zip.install -y --no-progress
 
-      - name: Create portable application
+      - name: Download 7-Zip Extra
         shell: pwsh
         run: |
-          $packageDir = "stage\PressureMat"
+          $url = "https://www.7-zip.org/a/7z2603-extra.7z"
 
-          New-Item -ItemType Directory -Force "stage" | Out-Null
-          New-Item -ItemType Directory -Force $packageDir | Out-Null
+          Invoke-WebRequest `
+            -Uri $url `
+            -OutFile "stage\7zip-extra.7z"
 
-          Copy-Item `
-            "build\release\pressure_mat_backend.exe" `
-            "$packageDir\PressureMat.exe"
+          & "C:\Program Files\7-Zip\7z.exe" x `
+            "stage\7zip-extra.7z" `
+            "-ostage\7zip-extra" `
+            -y
 
-          Copy-Item `
-            "build\release\frontend" `
-            "$packageDir\frontend" `
-            -Recurse
-
-          windeployqt `
-            --release `
-            --compiler-runtime `
-            --dir $packageDir `
-            "$packageDir\PressureMat.exe"
+          Write-Host "7-Zip Extra contents:"
+          Get-ChildItem "stage\7zip-extra" -Recurse
 
       - name: Create single executable
         shell: pwsh
         run: |
           $sevenZip = "C:\Program Files\7-Zip\7z.exe"
-          $sfxModule = "C:\Program Files\7-Zip\7z.sfx"
+          $sfxModule = Join-Path $PWD "stage\7zip-extra\7zS.sfx"
 
           $archive = Join-Path $PWD "stage\PressureMat.7z"
           $config = Join-Path $PWD "stage\sfx-config.txt"
           $outputExe = Join-Path $PWD "stage\PressureMat.exe"
 
-          if (-not (Test-Path $sevenZip)) {
-            throw "7z.exe not found: $sevenZip"
-          }
-
           if (-not (Test-Path $sfxModule)) {
-            throw "7z.sfx not found: $sfxModule"
+            throw "Installer SFX module not found: $sfxModule"
           }
 
-          # Create compressed archive containing the deployed application
+          # Create compressed application archive
           & $sevenZip a `
             -t7z `
             $archive `
@@ -122,13 +112,15 @@ jobs:
             -mx=9
 
           if ($LASTEXITCODE -ne 0) {
-            throw "Failed to create 7-Zip archive"
+            throw "Failed to create PressureMat.7z"
           }
 
-          # Configuration for the self-extracting executable
+          # SFX configuration:
+          # extract to a temporary directory and launch PressureMat.exe
           $configLines = @(
             ";!@Install@!UTF-8!"
             'Title="Pressure Mat Visualizer"'
+            'Progress="no"'
             'RunProgram="PressureMat.exe"'
             ";!@InstallEnd@!"
           )
@@ -139,12 +131,10 @@ jobs:
             [System.Text.UTF8Encoding]::new($false)
           )
 
-          # Read the SFX module, configuration and application archive
           $sfxBytes = [System.IO.File]::ReadAllBytes($sfxModule)
           $configBytes = [System.IO.File]::ReadAllBytes($config)
           $archiveBytes = [System.IO.File]::ReadAllBytes($archive)
 
-          # Combine them into one executable
           $stream = [System.IO.File]::Create($outputExe)
 
           try {
@@ -160,8 +150,7 @@ jobs:
             throw "PressureMat.exe was not created"
           }
 
-          Write-Host ""
-          Write-Host "Single executable successfully created:"
+          Write-Host "Single executable created:"
           Get-Item $outputExe
 
       - name: Create customer ZIP
