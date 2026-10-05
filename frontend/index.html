@@ -157,8 +157,17 @@
 
         </section>
 
-        <main class="visualization-grid">
-            <section class="panel">
+        <div class="view-controls">
+            <label for="view-mode">Graph view</label>
+            <select id="view-mode" aria-controls="visualization-grid">
+                <option value="both" selected>2D and 3D</option>
+                <option value="2d">2D only</option>
+                <option value="3d">3D only</option>
+            </select>
+        </div>
+
+        <main id="visualization-grid" class="visualization-grid" data-view="both">
+            <section id="heatmap-panel" class="panel">
                 <div class="panel-header">
                     <h2>2D Heatmap</h2>
                     <span class="cop-legend" title="Estimated from signal above the noise threshold">● Centre of pressure</span>
@@ -173,7 +182,7 @@
                 </div>
             </section>
 
-            <section class="panel">
+            <section id="surface-panel" class="panel">
                 <div class="panel-header">
                     <h2>3D Pressure Surface</h2>
                     <span class="cop-legend" title="Estimated from signal above the noise threshold">● Centre of pressure</span>

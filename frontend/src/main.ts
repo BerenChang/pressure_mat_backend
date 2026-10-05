@@ -36,6 +36,11 @@ function require2DContext(
 const canvas = requireElement<HTMLCanvasElement>("heatmap");
 const context = require2DContext(canvas);
 
+const viewModeSelect = requireElement<HTMLSelectElement>("view-mode");
+const visualizationGrid = requireElement<HTMLElement>("visualization-grid");
+const heatmapPanel = requireElement<HTMLElement>("heatmap-panel");
+const surfacePanel = requireElement<HTMLElement>("surface-panel");
+
 const statusDot = requireElement<HTMLSpanElement>("status-dot");
 const connectionStatus =
     requireElement<HTMLSpanElement>("connection-status");
@@ -236,6 +241,19 @@ function requestHeatmapRender(): void {
     renderPending = true;
     requestAnimationFrame(renderHeatmap);
 }
+
+function updateViewMode(): void {
+    const mode = viewModeSelect.value;
+    visualizationGrid.dataset.view = mode;
+    heatmapPanel.hidden = mode === "3d";
+    surfacePanel.hidden = mode === "2d";
+
+    // Redraw the current frame at its new size, even when acquisition is stopped.
+    // The 3D container's ResizeObserver handles its renderer and camera resize.
+    requestHeatmapRender();
+}
+
+viewModeSelect.addEventListener("change", updateViewMode);
 
 function setConnectionStatus(connected: boolean): void {
     statusDot.classList.toggle("connected", connected);
@@ -648,5 +666,5 @@ window.setInterval(() => {
     framesSinceReport = 0;
 }, 1000);
 
-renderHeatmap();
+updateViewMode();
 connectWebSocket();

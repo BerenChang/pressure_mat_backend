@@ -99,6 +99,42 @@ select {
     gap: 24px;
 }
 
+.visualization-grid[data-view="2d"],
+.visualization-grid[data-view="3d"] {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.panel[hidden] {
+    display: none;
+}
+
+.view-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.view-controls label {
+    color: #dbe5f4;
+    font-size: 0.9rem;
+    font-weight: 650;
+}
+
+.view-controls select {
+    padding: 9px 12px;
+    border: 1px solid #34425a;
+    border-radius: 9px;
+    color: #eef3fb;
+    background: #111a2a;
+    cursor: pointer;
+}
+
+.view-controls select:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
 .panel {
     min-width: 0;
     overflow: hidden;
