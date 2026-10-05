@@ -40,6 +40,8 @@ const viewModeSelect = requireElement<HTMLSelectElement>("view-mode");
 const visualizationGrid = requireElement<HTMLElement>("visualization-grid");
 const heatmapPanel = requireElement<HTMLElement>("heatmap-panel");
 const surfacePanel = requireElement<HTMLElement>("surface-panel");
+const heatmapResizeHandle = requireElement<HTMLButtonElement>("heatmap-resize-handle");
+const resetHeatmapSizeButton = requireElement<HTMLButtonElement>("reset-heatmap-size");
 
 const statusDot = requireElement<HTMLSpanElement>("status-dot");
 const connectionStatus =
@@ -113,6 +115,8 @@ let totalFrames = 0;
 let framesSinceReport = 0;
 let readingActive = false;
 let serialConnected = false;
+let preferredHeatmapWidth: number | null = null;
+let resizeDrag: { pointerId: number; startX: number; startWidth: number } | null = null;
 
 function createColorTable(): Uint8Array {
     const table = new Uint8Array(256 * 3);
@@ -247,6 +251,8 @@ function updateViewMode(): void {
     visualizationGrid.dataset.view = mode;
     heatmapPanel.hidden = mode === "3d";
     surfacePanel.hidden = mode === "2d";
+    resetHeatmapSizeButton.disabled = mode === "3d";
+    applyHeatmapWidth();
 
     // Redraw the current frame at its new size, even when acquisition is stopped.
     // The 3D container's ResizeObserver handles its renderer and camera resize.
@@ -254,6 +260,91 @@ function updateViewMode(): void {
 }
 
 viewModeSelect.addEventListener("change", updateViewMode);
+
+function heatmapWidthLimits(): { minimum: number; maximum: number } {
+    const available = visualizationGrid.clientWidth;
+    const sideBySide = viewModeSelect.value === "both"
+        && window.matchMedia("(min-width: 1101px)").matches;
+    // Keep room for the 3D panel and the grid gap in the combined layout.
+    const maximum = Math.max(1, available - (sideBySide ? 280 + 24 : 0));
+    return { minimum: Math.min(280, maximum), maximum };
+}
+
+function applyHeatmapWidth(): void {
+    if (preferredHeatmapWidth === null) {
+        visualizationGrid.style.removeProperty("--heatmap-width");
+        return;
+    }
+    const { minimum, maximum } = heatmapWidthLimits();
+    const width = Math.max(minimum, Math.min(maximum, preferredHeatmapWidth));
+    visualizationGrid.style.setProperty("--heatmap-width", `${width}px`);
+}
+
+function setHeatmapWidth(width: number): void {
+    const { minimum, maximum } = heatmapWidthLimits();
+    preferredHeatmapWidth = Math.max(minimum, Math.min(maximum, width));
+    applyHeatmapWidth();
+    requestHeatmapRender();
+}
+
+heatmapResizeHandle.addEventListener("pointerdown", (event) => {
+    if (!event.isPrimary || event.button !== 0) {
+        return;
+    }
+    resizeDrag = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startWidth: heatmapPanel.getBoundingClientRect().width,
+    };
+    heatmapResizeHandle.setPointerCapture(event.pointerId);
+    event.preventDefault();
+});
+
+heatmapResizeHandle.addEventListener("pointermove", (event) => {
+    if (resizeDrag === null || resizeDrag.pointerId !== event.pointerId) {
+        return;
+    }
+    // Preserve the mat's 2:1 proportions as its width changes.
+    setHeatmapWidth(resizeDrag.startWidth + event.clientX - resizeDrag.startX);
+});
+
+function endHeatmapResize(event: PointerEvent): void {
+    if (resizeDrag?.pointerId !== event.pointerId) {
+        return;
+    }
+    resizeDrag = null;
+    if (heatmapResizeHandle.hasPointerCapture(event.pointerId)) {
+        heatmapResizeHandle.releasePointerCapture(event.pointerId);
+    }
+}
+
+heatmapResizeHandle.addEventListener("pointerup", endHeatmapResize);
+heatmapResizeHandle.addEventListener("pointercancel", endHeatmapResize);
+heatmapResizeHandle.addEventListener("lostpointercapture", () => { resizeDrag = null; });
+
+heatmapResizeHandle.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+        return;
+    }
+    event.preventDefault();
+    const step = event.shiftKey ? 100 : 20;
+    setHeatmapWidth(heatmapPanel.getBoundingClientRect().width
+        + (event.key === "ArrowRight" ? step : -step));
+});
+
+resetHeatmapSizeButton.addEventListener("click", () => {
+    preferredHeatmapWidth = null;
+    applyHeatmapWidth();
+    requestHeatmapRender();
+});
+
+// Re-clamp when the browser changes size and redraw the stopped frame too.
+const heatmapLayoutObserver = new ResizeObserver(() => {
+    applyHeatmapWidth();
+    requestHeatmapRender();
+});
+heatmapLayoutObserver.observe(visualizationGrid);
+heatmapLayoutObserver.observe(canvas);
 
 function setConnectionStatus(connected: boolean): void {
     statusDot.classList.toggle("connected", connected);

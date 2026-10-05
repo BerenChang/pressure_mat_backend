@@ -95,8 +95,9 @@ select {
 
 .visualization-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, var(--heatmap-width, 1fr)) minmax(0, 1fr);
     gap: 24px;
+    align-items: start;
 }
 
 .visualization-grid[data-view="2d"],
@@ -112,6 +113,7 @@ select {
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-wrap: wrap;
     margin-bottom: 16px;
 }
 
@@ -133,6 +135,54 @@ select {
 .view-controls select:focus-visible {
     outline: 2px solid #3b82f6;
     outline-offset: 2px;
+}
+
+.size-reset-button {
+    padding: 9px 12px;
+    border: 1px solid #34425a;
+    border-radius: 9px;
+    color: #eef3fb;
+    background: #111a2a;
+    cursor: pointer;
+}
+
+.size-reset-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+#heatmap-panel {
+    width: var(--heatmap-width, 100%);
+    max-width: 100%;
+    justify-self: start;
+}
+
+#heatmap-panel .panel-header {
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.heatmap-resize-handle {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid #64748b;
+    border-radius: 8px 0 0;
+    color: #ffffff;
+    background: #17233a;
+    font-size: 22px;
+    cursor: nwse-resize;
+    touch-action: none;
+    user-select: none;
+}
+
+.heatmap-resize-handle:focus-visible,
+.size-reset-button:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: -3px;
 }
 
 .panel {

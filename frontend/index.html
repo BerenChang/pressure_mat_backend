@@ -164,6 +164,9 @@
                 <option value="2d">2D only</option>
                 <option value="3d">3D only</option>
             </select>
+            <button id="reset-heatmap-size" class="size-reset-button" type="button">
+                Reset 2D size
+            </button>
         </div>
 
         <main id="visualization-grid" class="visualization-grid" data-view="both">
@@ -179,6 +182,13 @@
                         width="1120"
                         height="560"
                     ></canvas>
+                    <button
+                        id="heatmap-resize-handle"
+                        class="heatmap-resize-handle"
+                        type="button"
+                        aria-label="Resize 2D graph. Use left and right arrow keys to adjust width."
+                        title="Drag to resize the 2D graph"
+                    >↘</button>
                 </div>
             </section>
 
