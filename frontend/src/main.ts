@@ -2,6 +2,7 @@ import "./style.css";
 import { PressureSurface3D } from "./PressureSurface3D";
 import { calculateCentreOfPressure } from "./centreOfPressure";
 import type { CentreOfPressure } from "./centreOfPressure";
+import { calculateLoadRatios, LoadRatioIndicator } from "./loadRatios";
 
 const ROWS = 28;
 const COLUMNS = 56;
@@ -42,6 +43,13 @@ const heatmapPanel = requireElement<HTMLElement>("heatmap-panel");
 const surfacePanel = requireElement<HTMLElement>("surface-panel");
 const heatmapResizeHandle = requireElement<HTMLButtonElement>("heatmap-resize-handle");
 const resetHeatmapSizeButton = requireElement<HTMLButtonElement>("reset-heatmap-size");
+
+const topBottomIndicators = ["heatmap-ratio-vertical", "surface-ratio-vertical"].map(
+    (id) => new LoadRatioIndicator(requireElement(id), "Top : Bottom", "A+B", "C+D"),
+);
+const leftRightIndicators = ["heatmap-ratio-horizontal", "surface-ratio-horizontal"].map(
+    (id) => new LoadRatioIndicator(requireElement(id), "Left : Right", "A+C", "B+D"),
+);
 
 const statusDot = requireElement<HTMLSpanElement>("status-dot");
 const connectionStatus =
@@ -160,6 +168,13 @@ function renderHeatmap(): void {
     const centreOfPressure = calculateCentreOfPressure(
         latestFrame, ROWS, COLUMNS, noiseThreshold,
     );
+    const ratios = calculateLoadRatios(latestFrame, ROWS, COLUMNS, noiseThreshold);
+    for (const indicator of topBottomIndicators) {
+        indicator.update(ratios?.top ?? null, "Top : Bottom");
+    }
+    for (const indicator of leftRightIndicators) {
+        indicator.update(ratios?.left ?? null, "Left : Right");
+    }
 
     for (let index = 0; index < CELL_COUNT; index++) {
         const rawValue = latestFrame[index];

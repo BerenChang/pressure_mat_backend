@@ -242,6 +242,157 @@ select {
     height: 100%;
 }
 
+.graph-layout {
+    display: grid;
+    grid-template-columns: 100px minmax(0, 1fr);
+    background: #03060b;
+}
+
+.graph-layout > .canvas-container,
+.graph-layout > .surface-container {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+}
+
+.load-ratio {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 10px 8px;
+    min-width: 0;
+    color: #dbe5f4;
+    font-variant-numeric: tabular-nums;
+}
+
+.ratio-vertical {
+    grid-column: 1;
+    grid-row: 1;
+    border-right: 1px solid #26334a;
+}
+
+.ratio-horizontal {
+    grid-column: 2;
+    grid-row: 2;
+    border-top: 1px solid #26334a;
+}
+
+.ratio-caption,
+.ratio-cell-label {
+    font-size: 0.68rem;
+    color: #91a0b7;
+    text-align: center;
+}
+
+.ratio-output {
+    /* Keep the combined ratio accessible; visible values are inside the bars. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.ratio-bars {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+.ratio-bar-item {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.ratio-value {
+    position: relative;
+    z-index: 1;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgb(3 6 11 / 65%);
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.ratio-track {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    overflow: hidden;
+    border-radius: 4px;
+    background: #17233a;
+}
+
+.ratio-track .ratio-cell-label {
+    position: relative;
+    z-index: 1;
+    color: #ffffff;
+    font-size: 0.6rem;
+    text-shadow: 0 1px 3px #03060b;
+}
+
+.ratio-fill {
+    position: absolute;
+    background: #22d3ee;
+}
+
+.ratio-second-fill {
+    background: #fb923c;
+}
+
+.ratio-vertical .ratio-track {
+    width: 100%;
+    height: clamp(50px, 8vw, 90px);
+}
+
+.ratio-vertical .ratio-bars {
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ratio-vertical .ratio-fill {
+    bottom: 0;
+    width: 100%;
+    height: var(--load-percent, 0%);
+}
+
+.ratio-vertical .ratio-second-fill {
+    top: 0;
+    bottom: auto;
+}
+
+.ratio-horizontal .ratio-bars {
+    max-width: 480px;
+}
+
+.ratio-horizontal .ratio-track {
+    width: 100%;
+    height: 38px;
+}
+
+.ratio-horizontal .ratio-fill {
+    left: 0;
+    height: 100%;
+    width: var(--load-percent, 0%);
+}
+
+.ratio-horizontal .ratio-first-fill {
+    right: 0;
+    left: auto;
+}
+
 .acquisition-controls {
     display: flex;
     align-items: center;
