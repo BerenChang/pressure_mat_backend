@@ -1,62 +1,48 @@
 name: Windows Build and Release
-
 on:
   push:
     branches:
       - main
     tags:
       - "v*"
-
   pull_request:
     branches:
       - main
-
   workflow_dispatch:
-
 permissions:
-  contents: write
-
+  contents: read
 jobs:
   build-windows:
     name: Build Windows application
     runs-on: windows-latest
-
     steps:
       # ------------------------------------------------------------
       # Checkout
       # ------------------------------------------------------------
-
       - name: Check out repository
         uses: actions/checkout@v4
-
       # ------------------------------------------------------------
       # Frontend
       # ------------------------------------------------------------
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
-
       - name: Build frontend
         working-directory: frontend
         run: npm run build
-
       # ------------------------------------------------------------
       # Qt / MinGW
       # ------------------------------------------------------------
-
       - name: Set up Python for Qt installer
         uses: actions/setup-python@v6
         with:
           python-version: "3.13"
-
       - name: Install Qt and MinGW
         uses: jurplel/install-qt-action@v4
         with:
@@ -68,11 +54,9 @@ jobs:
           tools: "tools_mingw1310,qt.tools.win64_mingw1310"
           setup-python: false
           cache: true
-
       # ------------------------------------------------------------
       # Build application
       # ------------------------------------------------------------
-
       - name: Configure CMake
         shell: pwsh
         run: |
@@ -80,12 +64,10 @@ jobs:
             -G "MinGW Makefiles" `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
-
       - name: Build backend
         shell: pwsh
         run: |
           cmake --build build/release --parallel
-
       # ------------------------------------------------------------
       # Prepare normal portable Qt application
       #
@@ -96,141 +78,108 @@ jobs:
       #   plugins/
       #   frontend/
       # ------------------------------------------------------------
-
       - name: Create portable application directory
         shell: pwsh
         run: |
           $packageDir = Join-Path $PWD "stage\PressureMat"
-
           New-Item `
             -ItemType Directory `
             -Force `
             $packageDir | Out-Null
-
           $backendExe = Join-Path `
             $PWD `
             "build\release\pressure_mat_backend.exe"
-
           if (-not (Test-Path $backendExe)) {
             throw "Backend executable was not found: $backendExe"
           }
-
           $frontendDir = Join-Path `
             $PWD `
             "build\release\frontend"
-
           if (-not (Test-Path $frontendDir)) {
             throw "Built frontend directory was not found: $frontendDir"
           }
-
           Copy-Item `
             $backendExe `
             (Join-Path $packageDir "PressureMat.exe")
-
           Copy-Item `
             $frontendDir `
             (Join-Path $packageDir "frontend") `
             -Recurse
-
           windeployqt `
             --release `
             --compiler-runtime `
             --dir $packageDir `
             (Join-Path $packageDir "PressureMat.exe")
-
           if ($LASTEXITCODE -ne 0) {
             throw "windeployqt failed"
           }
-
           Write-Host ""
           Write-Host "Portable application contents:"
           Get-ChildItem $packageDir -Recurse
-
       # ------------------------------------------------------------
       # Install current 7-Zip command line utility
       # ------------------------------------------------------------
-
       - name: Install 7-Zip
         shell: pwsh
         run: |
           choco install 7zip.install -y --no-progress
-
           $sevenZip = "C:\Program Files\7-Zip\7z.exe"
-
           if (-not (Test-Path $sevenZip)) {
             throw "7-Zip was not installed correctly"
           }
-
           & $sevenZip
-
       # ------------------------------------------------------------
       # Download official 7-Zip 26.03 source.
       #
       # We build 7zS.sfx ourselves instead of depending on an
       # Extra/LZMA package containing a prebuilt SFX module.
       # ------------------------------------------------------------
-
       - name: Download 7-Zip source
         shell: pwsh
         run: |
           $sourceArchive = Join-Path `
             $PWD `
             "stage\7z2603-src.7z"
-
           $sourceDir = Join-Path `
             $PWD `
             "stage\7zip-src"
-
           New-Item `
             -ItemType Directory `
             -Force `
             $sourceDir | Out-Null
-
           $url = "https://github.com/ip7z/7zip/releases/download/26.03/7z2603-src.7z"
-
           Invoke-WebRequest `
             -Uri $url `
             -OutFile $sourceArchive
-
           if (-not (Test-Path $sourceArchive)) {
             throw "7-Zip source archive was not downloaded"
           }
-
           # Official SHA-256 for 7z2603-src.7z
           $expectedHash = "41e2a7c0e9f838351c625e01f0f581a2188bb3dda10c8e0b4a852da26546ffe2"
-
           $actualHash = (
             Get-FileHash `
               $sourceArchive `
               -Algorithm SHA256
           ).Hash.ToLower()
-
           Write-Host "Expected SHA256: $expectedHash"
           Write-Host "Actual SHA256:   $actualHash"
-
           if ($actualHash -ne $expectedHash) {
             throw "7-Zip source SHA256 verification failed"
           }
-
           & "C:\Program Files\7-Zip\7z.exe" x `
             $sourceArchive `
             "-o$sourceDir" `
             -y
-
           if ($LASTEXITCODE -ne 0) {
             throw "Failed to extract 7-Zip source"
           }
-
           $makefile = Join-Path `
             $sourceDir `
             "CPP\7zip\Bundles\SFXSetup\makefile"
-
           if (-not (Test-Path $makefile)) {
             throw "SFXSetup makefile was not found: $makefile"
           }
-
           Write-Host "7-Zip source extracted successfully."
-
       # ------------------------------------------------------------
       # Build 7zS.sfx using MSVC.
       #
@@ -242,85 +191,63 @@ jobs:
       # PLATFORM=x64 makes output:
       # CPP/7zip/Bundles/SFXSetup/x64/7zS.sfx
       # ------------------------------------------------------------
-
       - name: Build 7-Zip installer SFX module
         shell: cmd
         run: |
           @echo off
-
           set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
-
           if not exist "%VSWHERE%" (
             echo ERROR: vswhere.exe was not found
             exit /b 1
           )
-
           for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do (
             set "VSINSTALL=%%i"
           )
-
           if not defined VSINSTALL (
             echo ERROR: Visual Studio C++ build tools were not found
             exit /b 1
           )
-
           echo Visual Studio:
           echo %VSINSTALL%
-
           call "%VSINSTALL%\VC\Auxiliary\Build\vcvars64.bat"
-
           if errorlevel 1 (
             echo ERROR: vcvars64.bat failed
             exit /b 1
           )
-
           cd /d "%GITHUB_WORKSPACE%\stage\7zip-src\CPP\7zip\Bundles\SFXSetup"
-
           nmake PLATFORM=x64
-
           if errorlevel 1 (
             echo ERROR: Failed to build 7zS.sfx
             exit /b 1
           )
-
           if not exist "x64\7zS.sfx" (
             echo ERROR: x64\7zS.sfx was not created
             exit /b 1
           )
-
           copy /Y "x64\7zS.sfx" "%GITHUB_WORKSPACE%\stage\7zS.sfx"
-
           if errorlevel 1 (
             echo ERROR: Failed to copy 7zS.sfx
             exit /b 1
           )
-
           echo.
           echo 7zS.sfx created successfully.
-
       # ------------------------------------------------------------
       # Create archive containing the whole Qt application
       # ------------------------------------------------------------
-
       - name: Create application archive
         shell: pwsh
         run: |
           $sevenZip = "C:\Program Files\7-Zip\7z.exe"
-
           $packageDir = Join-Path `
             $PWD `
             "stage\PressureMat"
-
           $archive = Join-Path `
             $PWD `
             "stage\PressureMat.7z"
-
           if (Test-Path $archive) {
             Remove-Item $archive -Force
           }
-
           Push-Location $packageDir
-
           try {
             & $sevenZip a `
               -t7z `
@@ -331,19 +258,15 @@ jobs:
           finally {
             Pop-Location
           }
-
           if ($LASTEXITCODE -ne 0) {
             throw "Failed to create application archive"
           }
-
           if (-not (Test-Path $archive)) {
             throw "PressureMat.7z was not created"
           }
-
           Write-Host ""
           Write-Host "Application archive:"
           Get-Item $archive
-
       # ------------------------------------------------------------
       # Create installer-SFX configuration.
       #
@@ -351,14 +274,12 @@ jobs:
       # runs PressureMat.exe and removes the temporary files when
       # finished.
       # ------------------------------------------------------------
-
       - name: Create SFX configuration
         shell: pwsh
         run: |
           $configPath = Join-Path `
             $PWD `
             "stage\sfx-config.txt"
-
           $configLines = @(
             ";!@Install@!UTF-8!"
             'Title="Pressure Mat Visualizer"'
@@ -366,16 +287,13 @@ jobs:
             'RunProgram="PressureMat.exe"'
             ";!@InstallEnd@!"
           )
-
           [System.IO.File]::WriteAllLines(
             $configPath,
             $configLines,
             [System.Text.UTF8Encoding]::new($false)
           )
-
           Write-Host "SFX configuration:"
           Get-Content $configPath
-
       # ------------------------------------------------------------
       # Combine:
       #
@@ -387,71 +305,56 @@ jobs:
       #
       # = PressureMat.exe
       # ------------------------------------------------------------
-
       - name: Create single PressureMat executable
         shell: pwsh
         run: |
           $sfxModule = Join-Path `
             $PWD `
             "stage\7zS.sfx"
-
           $config = Join-Path `
             $PWD `
             "stage\sfx-config.txt"
-
           $archive = Join-Path `
             $PWD `
             "stage\PressureMat.7z"
-
           $outputExe = Join-Path `
             $PWD `
             "stage\PressureMat.exe"
-
           if (-not (Test-Path $sfxModule)) {
             throw "7zS.sfx was not found: $sfxModule"
           }
-
           if (-not (Test-Path $config)) {
             throw "SFX configuration was not found: $config"
           }
-
           if (-not (Test-Path $archive)) {
             throw "Application archive was not found: $archive"
           }
-
           if (Test-Path $outputExe) {
             Remove-Item $outputExe -Force
           }
-
           $sfxBytes = [System.IO.File]::ReadAllBytes(
             $sfxModule
           )
-
           $configBytes = [System.IO.File]::ReadAllBytes(
             $config
           )
-
           $archiveBytes = [System.IO.File]::ReadAllBytes(
             $archive
           )
-
           $stream = [System.IO.File]::Create(
             $outputExe
           )
-
           try {
             $stream.Write(
               $sfxBytes,
               0,
               $sfxBytes.Length
             )
-
             $stream.Write(
               $configBytes,
               0,
               $configBytes.Length
             )
-
             $stream.Write(
               $archiveBytes,
               0,
@@ -461,41 +364,32 @@ jobs:
           finally {
             $stream.Dispose()
           }
-
           if (-not (Test-Path $outputExe)) {
             throw "PressureMat.exe was not created"
           }
-
           $size = (
             Get-Item $outputExe
           ).Length
-
           if ($size -lt 1000000) {
             throw "PressureMat.exe is unexpectedly small"
           }
-
           Write-Host ""
           Write-Host "=========================================="
           Write-Host "Single executable created successfully"
           Write-Host "=========================================="
-
           Get-Item $outputExe
-
       # ------------------------------------------------------------
       # Verify that Windows sees the output as a PE executable.
       #
       # PE executables begin with bytes MZ (4D 5A).
       # ------------------------------------------------------------
-
       - name: Verify executable
         shell: pwsh
         run: |
           $exe = Join-Path `
             $PWD `
             "stage\PressureMat.exe"
-
           $stream = [System.IO.File]::OpenRead($exe)
-
           try {
             $byte1 = $stream.ReadByte()
             $byte2 = $stream.ReadByte()
@@ -503,16 +397,13 @@ jobs:
           finally {
             $stream.Dispose()
           }
-
           if (
             $byte1 -ne 0x4D -or
             $byte2 -ne 0x5A
           ) {
             throw "PressureMat.exe does not have a valid Windows executable header"
           }
-
           Write-Host "Windows executable header verified."
-
       # ------------------------------------------------------------
       # Create the customer ZIP.
       #
@@ -522,74 +413,60 @@ jobs:
       #
       # Nothing else.
       # ------------------------------------------------------------
-
       - name: Create customer ZIP
         shell: pwsh
         run: |
           $outputZip = Join-Path `
             $PWD `
             "stage\PressureMat-Windows-x64.zip"
-
           if (Test-Path $outputZip) {
             Remove-Item $outputZip -Force
           }
-
           Compress-Archive `
             -LiteralPath "stage\PressureMat.exe" `
             -DestinationPath $outputZip `
             -CompressionLevel Optimal
-
           if (-not (Test-Path $outputZip)) {
             throw "Customer ZIP was not created"
           }
-
           Write-Host ""
           Write-Host "Final customer package:"
           Get-Item $outputZip
-
       # ------------------------------------------------------------
       # Verify ZIP contains exactly one file:
       # PressureMat.exe
       # ------------------------------------------------------------
-
       - name: Verify customer ZIP
         shell: pwsh
         run: |
           $verifyDir = Join-Path `
             $PWD `
             "stage\verify-zip"
-
           if (Test-Path $verifyDir) {
             Remove-Item `
               $verifyDir `
               -Recurse `
               -Force
           }
-
           New-Item `
             -ItemType Directory `
             -Force `
             $verifyDir | Out-Null
-
           Expand-Archive `
             -LiteralPath "stage\PressureMat-Windows-x64.zip" `
             -DestinationPath $verifyDir
-
           $files = @(
             Get-ChildItem `
               $verifyDir `
               -File `
               -Recurse
           )
-
           if ($files.Count -ne 1) {
             throw "Customer ZIP must contain exactly one file. Found: $($files.Count)"
           }
-
           if ($files[0].Name -ne "PressureMat.exe") {
             throw "Customer ZIP contains unexpected file: $($files[0].Name)"
           }
-
           Write-Host ""
           Write-Host "=========================================="
           Write-Host "Customer ZIP verified successfully"
@@ -597,7 +474,6 @@ jobs:
           Write-Host ""
           Write-Host "Contents:"
           Write-Host $files[0].Name
-
       # ------------------------------------------------------------
       # GitHub Actions artifact
       #
@@ -608,61 +484,66 @@ jobs:
       # The actual customer ZIP inside is:
       # PressureMat-Windows-x64.zip
       # ------------------------------------------------------------
-
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: PressureMat-Windows-x64
           path: stage/PressureMat-Windows-x64.zip
           if-no-files-found: error
-
-      # ------------------------------------------------------------
-      # GitHub Release
-      #
-      # Only runs for tags such as:
-      # v1.0.0
-      # ------------------------------------------------------------
-
-      - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+      # Publish only version tags to the separate public downloads repo.
+      # Private repo settings must define:
+      #   Actions secret RELEASE_TOKEN: token with target Contents write access
+      #   Actions variable RELEASE_REPO: owner/public-downloads-repo
+      - name: Publish executable to public downloads repo
+        if: startsWith(github.ref, 'refs/tags/v') && github.event_name != 'pull_request'
         shell: pwsh
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          RELEASE_REPO: ${{ vars.RELEASE_REPO }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          $tag = "${{ github.ref_name }}"
-
-          $asset = Join-Path `
-            $PWD `
-            "stage\PressureMat-Windows-x64.zip"
-
-          if (-not (Test-Path $asset)) {
-            throw "Release asset was not found: $asset"
+          if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
+            throw "Add the RELEASE_TOKEN Actions secret to this private repository."
           }
-
-          gh release view $tag *> $null
-
+          if ($env:RELEASE_REPO -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') {
+            throw "Set the RELEASE_REPO Actions variable to owner/public-downloads-repo."
+          }
+          $tag = $env:RELEASE_TAG
+          $repo = $env:RELEASE_REPO
+          $asset = Join-Path $PWD "stage\PressureMat.exe"
+          if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) {
+            throw "Release executable was not found: $asset"
+          }
+          # Check access first so an authentication failure is reported clearly.
+          $repoJson = gh repo view $repo --json isPrivate,defaultBranchRef
+          if ($LASTEXITCODE -ne 0) {
+            throw "Cannot access $repo. Check RELEASE_REPO and RELEASE_TOKEN permissions."
+          }
+          $repoInfo = ($repoJson -join "`n") | ConvertFrom-Json
+          if ($repoInfo.isPrivate) {
+            throw "The downloads repository must be public for customer access."
+          }
+          if (-not $repoInfo.defaultBranchRef.name) {
+            throw "The downloads repository is empty. Add and commit a README first."
+          }
+          $targetBranch = $repoInfo.defaultBranchRef.name
+          gh release view $tag --repo $repo *> $null
           if ($LASTEXITCODE -eq 0) {
-            Write-Host "Release already exists. Replacing asset..."
-
-            gh release upload `
-              $tag `
-              $asset `
-              --clobber
-
+            Write-Host "Release exists. Uploading PressureMat.exe..."
+            gh release upload $tag $asset --repo $repo --clobber
             if ($LASTEXITCODE -ne 0) {
-              throw "Failed to upload release asset"
+              throw "Failed to upload PressureMat.exe to the existing release."
             }
           }
           else {
-            Write-Host "Creating new GitHub release..."
-
-            gh release create `
-              $tag `
-              $asset `
+            Write-Host "Creating public release $tag..."
+            gh release create $tag $asset `
+              --repo $repo `
+              --target $targetBranch `
               --title "Pressure Mat $tag" `
-              --generate-notes
-
+              --notes "Download PressureMat.exe below to run the Windows application."
             if ($LASTEXITCODE -ne 0) {
-              throw "Failed to create GitHub release"
+              throw "Failed to create the public release."
             }
           }
+          Write-Host "Release: https://github.com/$repo/releases/tag/$tag"
