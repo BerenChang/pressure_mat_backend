@@ -1,4 +1,5 @@
 #include "SerialReceiver.h"
+#include "snapshotbuffer.h"
 
 #include <QIODevice>
 #include <QSerialPortInfo>
@@ -128,6 +129,7 @@ void SerialReceiver::sendCommand(const QByteArray &command)
 
 void SerialReceiver::handleReadyRead()
 {
+    const qint64 receiptNs = SnapshotBuffer::nowNs();
     const QByteArray bytes = serialPort_.readAll();
 
     static int loggedChunks = 0;
@@ -146,6 +148,7 @@ void SerialReceiver::handleReadyRead()
             reinterpret_cast<const char *>(frame.data()),
             static_cast<qsizetype>(frame.size()));
 
+        emit timestampedFrameReceived(payload, receiptNs, frames.size() > 1);
         emit frameReceived(payload);
     }
 }

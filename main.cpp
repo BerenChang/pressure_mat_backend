@@ -1,6 +1,7 @@
 #include "PressureWebSocketServer.h"
 #include "SerialReceiver.h"
 #include "StaticHttpServer.h"
+#include "snapshotservice.h"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -58,6 +59,11 @@ int main(int argc, char *argv[])
     SerialReceiver receiver;
     PressureWebSocketServer webSocketServer;
     StaticHttpServer httpServer;
+    SnapshotService snapshots;
+    QObject::connect(&receiver, &SerialReceiver::timestampedFrameReceived,
+                     &snapshots, &SnapshotService::addFrame);
+    QObject::connect(&snapshots, &SnapshotService::messageReady,
+                     &webSocketServer, &PressureWebSocketServer::broadcastTextMessage);
 
     quint64 framesThisSecond = 0;
     quint64 totalFrames = 0;
@@ -198,6 +204,7 @@ int main(int argc, char *argv[])
             }
 
             readingActive = false;
+            snapshots.setActive(false);
             activePort.clear();
             sendSerialStatus();
         });
@@ -208,6 +215,7 @@ int main(int argc, char *argv[])
         [&](const QString &message) {
             if (message == QStringLiteral("start_reading")) {
                 if (receiver.isOpen()) {
+                    if (!readingActive) snapshots.setActive(true);
                     receiver.startReading();
                     readingActive = true;
                 }
@@ -217,6 +225,7 @@ int main(int argc, char *argv[])
             }
 
             if (message == QStringLiteral("stop_reading")) {
+                snapshots.setActive(false);
                 receiver.stopReading();
                 readingActive = false;
                 sendSerialStatus();
@@ -239,6 +248,7 @@ int main(int argc, char *argv[])
                            QStringLiteral("command")).toString();
 
             if (action == QStringLiteral("connect")) {
+                snapshots.setActive(false);
                 const QString portName =
                     command.value(
                                QStringLiteral("port")).toString();
@@ -262,6 +272,7 @@ int main(int argc, char *argv[])
             }
 
             if (action == QStringLiteral("disconnect")) {
+                snapshots.setActive(false);
                 receiver.closePort();
                 activePort.clear();
                 readingActive = false;
@@ -303,11 +314,18 @@ int main(int argc, char *argv[])
 
             sendPortList();
             sendSerialStatus();
+            if (!snapshots.lastSnapshot().isEmpty())
+                webSocketServer.broadcastTextMessage(snapshots.lastSnapshot());
         });
 
     if (!webSocketServer.listen(9002)) {
         return 1;
     }
+    if (!snapshots.listen()) {
+        qCritical() << "Could not bind snapshot UDP port 127.0.0.1:9003";
+        return 1;
+    }
+    qInfo() << "Snapshot trigger: send SNAPSHOT to UDP 127.0.0.1:9003";
 
     const QString frontendDirectory =
         findFrontendDirectory();
@@ -325,23 +343,25 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    QTimer::singleShot(
-        250,
-        []() {
-            const QString dashboardUrl =
-                QStringLiteral(
-                    "http://127.0.0.1:8080");
+    if (!app.arguments().contains(QStringLiteral("--no-browser"))) {
+        QTimer::singleShot(
+            250,
+            []() {
+                const QString dashboardUrl =
+                    QStringLiteral(
+                        "http://127.0.0.1:8080");
 
-            if (
-                !QProcess::startDetached(
-                    QStringLiteral("explorer.exe"),
-                    QStringList{dashboardUrl})
-                ) {
-                qWarning()
-                << "Could not open dashboard:"
-                << dashboardUrl;
-            }
-        });
+                if (
+                    !QProcess::startDetached(
+                        QStringLiteral("explorer.exe"),
+                        QStringList{dashboardUrl})
+                    ) {
+                    qWarning()
+                    << "Could not open dashboard:"
+                    << dashboardUrl;
+                }
+            });
+    }
 
     reportTimer.start(1000);
 

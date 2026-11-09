@@ -8,6 +8,14 @@
     text-rendering: optimizeLegibility;
 }
 
+#snapshot-panel { margin-top: 24px; padding: 20px; }
+#snapshot-panel .panel-header { flex-wrap: wrap; gap: 16px; }
+#snapshot-panel a { color: #80c7ff; }
+#snapshot-panel p { color: #aab9d0; line-height: 1.5; }
+#snapshot-heatmap { width: 100%; height: auto; aspect-ratio: 2; background: #03060f; border-radius: 8px; }
+.snapshot-only #app > :not(#snapshot-panel) { display: none !important; }
+.snapshot-only #snapshot-panel { margin: 0; }
+
 * {
     box-sizing: border-box;
 }
@@ -620,4 +628,55 @@ select {
     .slider-control {
         width: 100%;
     }
+}
+
+/* Compact dashboard inside the Kinovea capture pane. */
+.kinovea-embed #app {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+}
+
+.kinovea-embed .app-header,
+.kinovea-embed .connection-panel,
+.kinovea-embed .display-controls {
+    gap: 8px;
+    margin: 0;
+    padding: 8px;
+    border-radius: 8px;
+}
+
+.kinovea-embed .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+}
+
+.kinovea-embed .app-header h1 {
+    font-size: 1rem;
+}
+
+.kinovea-embed .app-header p {
+    display: none;
+}
+
+.kinovea-embed .status-area,
+.kinovea-embed .connection-panel,
+.kinovea-embed .connection-actions,
+.kinovea-embed .display-controls {
+    flex-wrap: wrap;
+}
+
+.kinovea-embed .view-controls {
+    margin: 0;
+}
+
+.kinovea-embed .visualization-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+}
+
+.kinovea-embed .display-controls,
+.kinovea-embed #snapshot-panel {
+    order: 1;
 }

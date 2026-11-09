@@ -9,7 +9,7 @@ export interface CentreOfPressure {
  * for a physical centre of pressure when sensor response is nonlinear.
  */
 export function calculateCentreOfPressure(
-    frame: Uint8Array,
+    frame: ArrayLike<number>,
     rows: number,
     columns: number,
     noiseThreshold: number,

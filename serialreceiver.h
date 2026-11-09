@@ -27,6 +27,7 @@ public:
 
 signals:
     void frameReceived(const QByteArray &payload);
+    void timestampedFrameReceived(const QByteArray &payload, qint64 timeNs, bool batched);
     void connectionChanged(bool connected);
     void statusMessage(const QString &message);
     void serialError(const QString &message);

@@ -510,6 +510,11 @@ jobs:
           }
           $tag = $env:RELEASE_TAG
           $repo = $env:RELEASE_REPO
+          # Keep piezo releases separate from the main release's Latest label.
+          $releaseOptions = @()
+          if ($tag -match '-piezo(?:[.-]|$)') {
+            $releaseOptions += '--latest=false'
+          }
           $asset = Join-Path $PWD "stage\PressureMat.exe"
           if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) {
             throw "Release executable was not found: $asset"
@@ -541,7 +546,8 @@ jobs:
               --repo $repo `
               --target $targetBranch `
               --title "Pressure Mat $tag" `
-              --notes "Download PressureMat.exe below to run the Windows application."
+              --notes "Download PressureMat.exe below to run the Windows application." `
+              @releaseOptions
             if ($LASTEXITCODE -ne 0) {
               throw "Failed to create the public release."
             }

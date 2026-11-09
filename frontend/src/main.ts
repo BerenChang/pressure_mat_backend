@@ -1,4 +1,5 @@
 import "./style.css";
+import { SnapshotView } from "./SnapshotView";
 import { PressureSurface3D } from "./PressureSurface3D";
 import { calculateCentreOfPressure } from "./centreOfPressure";
 import type { CentreOfPressure } from "./centreOfPressure";
@@ -8,6 +9,8 @@ const ROWS = 28;
 const COLUMNS = 56;
 const CELL_COUNT = ROWS * COLUMNS;
 const WEBSOCKET_URL = "ws://127.0.0.1:9002";
+const embedded = new URLSearchParams(window.location.search).get("embed") === "kinovea";
+document.body.classList.toggle("kinovea-embed", embedded);
 
 function requireElement<T extends HTMLElement>(id: string): T {
     const element = document.getElementById(id);
@@ -111,6 +114,7 @@ const sourceContext =
 
 const imageData = sourceContext.createImageData(COLUMNS, ROWS);
 const colorTable = createColorTable();
+const snapshotView = new SnapshotView(colorTable);
 
 let socket: WebSocket | null = null;
 let latestFrame = new Uint8Array(CELL_COUNT);
@@ -274,11 +278,14 @@ function updateViewMode(): void {
     requestHeatmapRender();
 }
 
+if (embedded) {
+    viewModeSelect.value = "3d";
+}
 viewModeSelect.addEventListener("change", updateViewMode);
 
 function heatmapWidthLimits(): { minimum: number; maximum: number } {
     const available = visualizationGrid.clientWidth;
-    const sideBySide = viewModeSelect.value === "both"
+    const sideBySide = !embedded && viewModeSelect.value === "both"
         && window.matchMedia("(min-width: 1101px)").matches;
     // Keep room for the 3D panel and the grid gap in the combined layout.
     const maximum = Math.max(1, available - (sideBySide ? 280 + 24 : 0));
@@ -610,6 +617,7 @@ function connectWebSocket(): void {
 
     socket.onmessage = (event: MessageEvent) => {
         if (typeof event.data === "string") {
+            if (snapshotView.handle(event.data)) return;
             handleBackendMessage(event.data);
             return;
         }
@@ -624,6 +632,7 @@ function connectWebSocket(): void {
     };
 
     socket.onclose = () => {
+        snapshotView.disconnected();
         setConnectionStatus(false);
         readingActive = false;
         serialConnected = false;

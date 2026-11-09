@@ -209,6 +209,17 @@
                 </div>
             </section>
         </main>
+        <section id="snapshot-panel" class="panel">
+            <div class="panel-header">
+                <h2>Frozen snapshot</h2>
+                <span class="cop-legend" title="Estimated from the captured raw pressure values">● Centre of pressure</span>
+                <a href="/?snapshot=1" target="_blank" rel="noopener">Open second-screen view</a>
+                <button id="download-snapshot" class="control-button" type="button" disabled>Save JSON</button>
+            </div>
+            <p id="snapshot-status" role="status">Waiting for a capture. Live acquisition continues while this view is frozen.</p>
+            <canvas id="snapshot-heatmap" width="1120" height="560" aria-label="Frozen pressure snapshot"></canvas>
+            <p>Raw pressure scale: 0–255. Each successful trigger replaces this view. Live display sliders do not change it.</p>
+        </section>
     </div>
 
     <script type="module" src="/src/main.ts"></script>
