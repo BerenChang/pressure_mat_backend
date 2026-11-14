@@ -40,6 +40,11 @@ function require2DContext(
 const canvas = requireElement<HTMLCanvasElement>("heatmap");
 const context = require2DContext(canvas);
 
+const deviceSettings = requireElement<HTMLDialogElement>("device-settings");
+requireElement<HTMLButtonElement>("open-device-settings").addEventListener("click", () => {
+    deviceSettings.showModal();
+});
+
 const viewModeSelect = requireElement<HTMLSelectElement>("view-mode");
 const visualizationGrid = requireElement<HTMLElement>("visualization-grid");
 const heatmapPanel = requireElement<HTMLElement>("heatmap-panel");
@@ -47,11 +52,19 @@ const surfacePanel = requireElement<HTMLElement>("surface-panel");
 const heatmapResizeHandle = requireElement<HTMLButtonElement>("heatmap-resize-handle");
 const resetHeatmapSizeButton = requireElement<HTMLButtonElement>("reset-heatmap-size");
 
+if (embedded) {
+    const graphSettings = requireElement<HTMLDialogElement>("graph-settings");
+    const graphSettingsButton = requireElement<HTMLButtonElement>("open-graph-settings");
+    graphSettings.append(requireElement("view-controls"));
+    graphSettingsButton.hidden = false;
+    graphSettingsButton.addEventListener("click", () => graphSettings.showModal());
+}
+
 const topBottomIndicators = ["heatmap-ratio-vertical", "surface-ratio-vertical"].map(
-    (id) => new LoadRatioIndicator(requireElement(id), "Top : Bottom", "A+B", "C+D"),
+    (id) => new LoadRatioIndicator(requireElement(id), "Top : Bottom", "Top", "Bottom"),
 );
 const leftRightIndicators = ["heatmap-ratio-horizontal", "surface-ratio-horizontal"].map(
-    (id) => new LoadRatioIndicator(requireElement(id), "Left : Right", "A+C", "B+D"),
+    (id) => new LoadRatioIndicator(requireElement(id), "Left : Right", "Left", "Right"),
 );
 
 const statusDot = requireElement<HTMLSpanElement>("status-dot");
@@ -86,8 +99,7 @@ const disconnectSerialButton =
 const surfaceContainer =
     requireElement<HTMLDivElement>("surface-3d");
 
-const pressureSurface =
-    new PressureSurface3D(surfaceContainer);
+let pressureSurface: PressureSurface3D | undefined;
 
 const noiseThresholdSlider =
     requireElement<HTMLInputElement>("noise-threshold");
@@ -114,6 +126,18 @@ const sourceContext =
 
 const imageData = sourceContext.createImageData(COLUMNS, ROWS);
 const colorTable = createColorTable();
+const scaleMinimum = requireElement("scale-minimum");
+const scaleMaximum = requireElement("scale-maximum");
+const scaleColors = [0, 64, 128, 191, 255].map((value) =>
+    `rgb(${colorTable.slice(value * 3, value * 3 + 3).join(" ")})`,
+);
+requireElement("scale-gradient").style.background =
+    `linear-gradient(to right, ${scaleColors.join(", ")})`;
+
+function updatePressureScale(): void {
+    scaleMinimum.textContent = noiseThreshold.toString();
+    scaleMaximum.textContent = displayMaximum.toString();
+}
 const snapshotView = new SnapshotView(colorTable);
 
 let socket: WebSocket | null = null;
@@ -231,7 +255,9 @@ function renderHeatmap(): void {
     );
 
     drawCentreOfPressure(centreOfPressure);
-    pressureSurface.update(visualizationFrame, centreOfPressure);
+    if (!surfacePanel.hidden) {
+        pressureSurface?.update(visualizationFrame, centreOfPressure);
+    }
 }
 
 function drawCentreOfPressure(centre: CentreOfPressure | null): void {
@@ -271,6 +297,9 @@ function updateViewMode(): void {
     heatmapPanel.hidden = mode === "3d";
     surfacePanel.hidden = mode === "2d";
     resetHeatmapSizeButton.disabled = mode === "3d";
+    if (!surfacePanel.hidden) {
+        pressureSurface ??= new PressureSurface3D(surfaceContainer);
+    }
     applyHeatmapWidth();
 
     // Redraw the current frame at its new size, even when acquisition is stopped.
@@ -279,7 +308,7 @@ function updateViewMode(): void {
 }
 
 if (embedded) {
-    viewModeSelect.value = "3d";
+    viewModeSelect.value = "2d";
 }
 viewModeSelect.addEventListener("change", updateViewMode);
 
@@ -371,7 +400,7 @@ heatmapLayoutObserver.observe(canvas);
 function setConnectionStatus(connected: boolean): void {
     statusDot.classList.toggle("connected", connected);
     connectionStatus.textContent =
-        connected ? "Connected" : "Disconnected";
+        connected ? "Mat disconnected" : "Backend disconnected";
 }
 
 function handleBackendMessage(text: string): void {
@@ -501,8 +530,8 @@ function handleBackendMessage(text: string): void {
 
             connectionStatus.textContent =
                 serialConnected
-                    ? `Mat connected (${message.port})`
-                    : "Backend connected";
+                    ? "Mat connected"
+                    : "Mat disconnected";
 
             updateControlButtons();
             return;
@@ -522,8 +551,8 @@ function handleBackendMessage(text: string): void {
             readingActive = false;
         
             statusDot.classList.remove("connected");
-            connectionStatus.textContent =
-                `Serial error: ${errorMessage}`;
+            console.warn("Serial error:", errorMessage);
+            connectionStatus.textContent = "Serial connection error";
         
             updateControlButtons();
             return;
@@ -729,6 +758,7 @@ noiseThresholdSlider.addEventListener(
                 displayMaximum.toString();
         }
 
+        updatePressureScale();
         requestHeatmapRender();
     },
 );
@@ -747,6 +777,7 @@ displayMaximumSlider.addEventListener(
         displayMaximumValue.value =
             displayMaximum.toString();
 
+        updatePressureScale();
         requestHeatmapRender();
     },
 );
@@ -776,7 +807,7 @@ window.setInterval(() => {
         `${framesSinceReport} FPS`;
 
     frameCountElement.textContent =
-        totalFrames.toLocaleString();
+        totalFrames.toLocaleString("en-US");
 
     framesSinceReport = 0;
 }, 1000);

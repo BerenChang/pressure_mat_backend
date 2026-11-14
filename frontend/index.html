@@ -42,65 +42,90 @@
                     <span id="connection-status">Disconnected</span>
                 </div>
 
-                <div class="status-item">
-                    <span>Rate</span>
-                    <strong id="frame-rate">0 FPS</strong>
-                </div>
-
-                <div class="status-item">
-                    <span>Frames</span>
-                    <strong id="frame-count">0</strong>
+                <div class="settings-actions">
+                    <button id="open-device-settings" class="size-reset-button" type="button"
+                        aria-haspopup="dialog" aria-controls="device-settings">Device settings</button>
+                    <button id="open-graph-settings" class="size-reset-button" type="button"
+                        aria-haspopup="dialog" aria-controls="graph-settings" hidden>Graph view</button>
                 </div>
             </div>
         </header>
 
-        <section class="connection-panel">
-            <div class="connection-field">
-                <label for="serial-port">Serial port</label>
-        
-                <select id="serial-port" disabled>
-                    <option value="">No ports detected</option>
-                </select>
+        <dialog id="device-settings" class="settings-dialog" aria-labelledby="device-settings-title">
+            <div class="settings-header">
+                <h2 id="device-settings-title">Device settings</h2>
+                <form method="dialog">
+                    <button class="size-reset-button" autofocus>Close</button>
+                </form>
             </div>
-        
-            <div class="connection-field">
-                <label for="baud-rate">Baud rate</label>
-        
-                <select id="baud-rate" disabled>
-                    <option value="115200">115200</option>
-                    <option value="961200">961200</option>
-                </select>
-            </div>
-        
-            <div class="connection-actions">
-                <button
-                    id="refresh-ports"
-                    class="control-button refresh-button"
-                    type="button"
-                    disabled
-                >
-                    Refresh
-                </button>
+            <div class="connection-panel">
+                <div class="connection-field">
+                    <label for="serial-port">COM port</label>
 
-                <button
-                    id="connect-serial"
-                    class="control-button connect-button"
-                    type="button"
-                    disabled
-                >
-                    Connect
-                </button>
-        
-                <button
-                    id="disconnect-serial"
-                    class="control-button disconnect-button"
-                    type="button"
-                    disabled
-                >
-                    Disconnect
-                </button>
+                    <select id="serial-port" disabled>
+                        <option value="">No ports detected</option>
+                    </select>
+                </div>
+
+                <div class="connection-field">
+                    <label for="baud-rate">Baud rate</label>
+
+                    <select id="baud-rate" disabled>
+                        <option value="115200">115200</option>
+                        <option value="961200">961200</option>
+                    </select>
+                </div>
+
+                <div class="connection-actions">
+                    <button
+                        id="refresh-ports"
+                        class="control-button refresh-button"
+                        type="button"
+                        disabled
+                    >
+                        Refresh
+                    </button>
+
+                    <button
+                        id="connect-serial"
+                        class="control-button connect-button"
+                        type="button"
+                        disabled
+                    >
+                        Connect
+                    </button>
+
+                    <button
+                        id="disconnect-serial"
+                        class="control-button disconnect-button"
+                        type="button"
+                        disabled
+                    >
+                        Disconnect
+                    </button>
+                </div>
             </div>
-        </section>
+            <div class="frame-counters">
+                <div class="status-item">
+                    <span>Frame rate</span>
+                    <strong id="frame-rate">0 FPS</strong>
+                </div>
+
+                <div class="status-item">
+                    <span>Total frames</span>
+                    <strong id="frame-count">0</strong>
+                </div>
+            </div>
+        </dialog>
+
+        <dialog id="graph-settings" class="settings-dialog" aria-labelledby="graph-settings-title">
+            <div class="settings-header">
+                <h2 id="graph-settings-title">Graph view</h2>
+                <form method="dialog">
+                    <button class="size-reset-button" autofocus>Close</button>
+                </form>
+            </div>
+        </dialog>
 
         <section class="display-controls">
             <div class="slider-control">
@@ -157,7 +182,7 @@
 
         </section>
 
-        <div class="view-controls">
+        <div id="view-controls" class="view-controls">
             <label for="view-mode">Graph view</label>
             <select id="view-mode" aria-controls="visualization-grid">
                 <option value="both" selected>2D and 3D</option>
@@ -173,7 +198,7 @@
             <section id="heatmap-panel" class="panel">
                 <div class="panel-header">
                     <h2>2D Heatmap</h2>
-                    <span class="cop-legend" title="Estimated from signal above the noise threshold">● Centre of pressure</span>
+                    <span class="cop-legend" title="Estimated from signal above the noise threshold">● Center of pressure</span>
                 </div>
 
                 <div class="graph-layout">
@@ -181,6 +206,7 @@
                     <div class="canvas-container">
                         <canvas
                             id="heatmap"
+                            aria-label="Pressure heatmap, 56 columns by 28 rows"
                             width="1120"
                             height="560"
                         ></canvas>
@@ -199,7 +225,7 @@
             <section id="surface-panel" class="panel">
                 <div class="panel-header">
                     <h2>3D Pressure Surface</h2>
-                    <span class="cop-legend" title="Estimated from signal above the noise threshold">● Centre of pressure</span>
+                    <span class="cop-legend" title="Estimated from signal above the noise threshold">● Center of pressure</span>
                 </div>
 
                 <div class="graph-layout">
@@ -209,10 +235,16 @@
                 </div>
             </section>
         </main>
+        <div class="pressure-scale" role="group" aria-label="Pressure color scale">
+            <span>Color scale</span>
+            <span id="scale-minimum">0</span>
+            <span id="scale-gradient" aria-hidden="true"></span>
+            <span id="scale-maximum">255</span>
+        </div>
         <section id="snapshot-panel" class="panel">
             <div class="panel-header">
                 <h2>Frozen snapshot</h2>
-                <span class="cop-legend" title="Estimated from the captured raw pressure values">● Centre of pressure</span>
+                <span class="cop-legend" title="Estimated from the captured raw pressure values">● Center of pressure</span>
                 <a href="/?snapshot=1" target="_blank" rel="noopener">Open second-screen view</a>
                 <button id="download-snapshot" class="control-button" type="button" disabled>Save JSON</button>
             </div>

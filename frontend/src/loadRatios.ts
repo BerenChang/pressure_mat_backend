@@ -63,14 +63,14 @@ export class LoadRatioIndicator {
                     <div class="ratio-track">
                         <div class="ratio-fill ratio-first-fill"></div>
                         <span class="ratio-value ratio-first-value">—</span>
-                        <span class="ratio-cell-label" hidden>${firstLabel}</span>
+                        <span class="ratio-cell-label">${firstLabel}</span>
                     </div>
                 </div>
                 <div class="ratio-bar-item">
                     <div class="ratio-track">
                         <div class="ratio-fill ratio-second-fill"></div>
                         <span class="ratio-value ratio-second-value">—</span>
-                        <span class="ratio-cell-label" hidden>${secondLabel}</span>
+                        <span class="ratio-cell-label">${secondLabel}</span>
                     </div>
                 </div>
             </div>`;
