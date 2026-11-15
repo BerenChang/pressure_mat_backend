@@ -60,11 +60,17 @@ if (embedded) {
     graphSettingsButton.addEventListener("click", () => graphSettings.showModal());
 }
 
-const topBottomIndicators = ["heatmap-ratio-vertical", "surface-ratio-vertical"].map(
-    (id) => new LoadRatioIndicator(requireElement(id), "Top : Bottom", "Top", "Bottom"),
+const topBottomIndicators = ["heatmap", "surface"].map(
+    (graph) => new LoadRatioIndicator(
+        requireElement(`${graph}-ratio-vertical`), "Top : Bottom", "Top", "Bottom",
+        embedded ? requireElement(`${graph}-readout-vertical`) : undefined,
+    ),
 );
-const leftRightIndicators = ["heatmap-ratio-horizontal", "surface-ratio-horizontal"].map(
-    (id) => new LoadRatioIndicator(requireElement(id), "Left : Right", "Left", "Right"),
+const leftRightIndicators = ["heatmap", "surface"].map(
+    (graph) => new LoadRatioIndicator(
+        requireElement(`${graph}-ratio-horizontal`), "Left : Right", "Left", "Right",
+        embedded ? requireElement(`${graph}-readout-horizontal`) : undefined,
+    ),
 );
 
 const statusDot = requireElement<HTMLSpanElement>("status-dot");

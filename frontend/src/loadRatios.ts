@@ -53,6 +53,7 @@ export class LoadRatioIndicator {
         caption: string,
         firstLabel: string,
         secondLabel: string,
+        readout?: HTMLElement,
     ) {
         // All labels are fixed application strings.
         container.innerHTML = `
@@ -80,6 +81,7 @@ export class LoadRatioIndicator {
         this.secondValue = container.querySelector<HTMLElement>(".ratio-second-value")!;
         this.firstFill = container.querySelector<HTMLElement>(".ratio-first-fill")!;
         this.secondFill = container.querySelector<HTMLElement>(".ratio-second-fill")!;
+        readout?.append(this.firstValue, this.secondValue);
         this.output.setAttribute("aria-label", `${caption}: no load`);
         // Avoid announcing rapidly changing sensor data on every frame.
         this.output.setAttribute("aria-live", "off");

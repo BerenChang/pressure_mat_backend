@@ -218,7 +218,13 @@
                             title="Drag to resize the 2D graph"
                         >↘</button>
                     </div>
-                    <div id="heatmap-ratio-horizontal" class="load-ratio ratio-horizontal"></div>
+                    <div class="ratio-footer">
+                        <div class="ratio-readout" aria-hidden="true">
+                            <div id="heatmap-readout-vertical" class="ratio-readout-vertical"></div>
+                            <div id="heatmap-readout-horizontal" class="ratio-readout-horizontal"></div>
+                        </div>
+                        <div id="heatmap-ratio-horizontal" class="load-ratio ratio-horizontal"></div>
+                    </div>
                 </div>
             </section>
 
@@ -231,7 +237,13 @@
                 <div class="graph-layout">
                     <div id="surface-ratio-vertical" class="load-ratio ratio-vertical"></div>
                     <div id="surface-3d" class="surface-container"></div>
-                    <div id="surface-ratio-horizontal" class="load-ratio ratio-horizontal"></div>
+                    <div class="ratio-footer">
+                        <div class="ratio-readout" aria-hidden="true">
+                            <div id="surface-readout-vertical" class="ratio-readout-vertical"></div>
+                            <div id="surface-readout-horizontal" class="ratio-readout-horizontal"></div>
+                        </div>
+                        <div id="surface-ratio-horizontal" class="load-ratio ratio-horizontal"></div>
+                    </div>
                 </div>
             </section>
         </main>
